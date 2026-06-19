@@ -14,10 +14,9 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
-import android.support.annotation.IntDef;
-import android.support.v4.content.res.TypedArrayUtils;
-import android.support.v7.preference.DialogPreference;
-import android.support.v7.preference.Preference;
+import androidx.annotation.IntDef;
+import androidx.preference.DialogPreference;
+import androidx.preference.Preference;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 
@@ -95,10 +94,12 @@ public class RingtonePreference extends DialogPreference {
     this(context, attrs, defStyleAttr, 0);
   }
 
-  @SuppressLint("RestrictedApi")
   public RingtonePreference(Context context, AttributeSet attrs) {
-    this(context, attrs, TypedArrayUtils.getAttr(context, R.attr.dialogPreferenceStyle,
-                                                 android.R.attr.dialogPreferenceStyle));
+    this(context, attrs, getDialogPreferenceStyleAttr(context));
+  }
+
+  private static int getDialogPreferenceStyleAttr(Context context) {
+    return android.R.attr.dialogPreferenceStyle;
   }
 
   public RingtonePreference(Context context) {

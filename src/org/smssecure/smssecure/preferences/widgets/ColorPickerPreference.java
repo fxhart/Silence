@@ -1,14 +1,12 @@
 package org.smssecure.smssecure.preferences.widgets;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.content.res.TypedArrayUtils;
-import android.support.v7.preference.DialogPreference;
-import android.support.v7.preference.PreferenceViewHolder;
+import androidx.core.content.ContextCompat;
+import androidx.preference.DialogPreference;
+import androidx.preference.PreferenceViewHolder;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.widget.ImageView;
@@ -59,10 +57,12 @@ public class ColorPickerPreference extends DialogPreference {
     this(context, attrs, defStyleAttr, 0);
   }
 
-  @SuppressLint("RestrictedApi")
   public ColorPickerPreference(Context context, AttributeSet attrs) {
-    this(context, attrs, TypedArrayUtils.getAttr(context, R.attr.dialogPreferenceStyle,
-                                                 android.R.attr.dialogPreferenceStyle));
+    this(context, attrs, getDialogPreferenceStyleAttr(context));
+  }
+
+  private static int getDialogPreferenceStyleAttr(Context context) {
+    return android.R.attr.dialogPreferenceStyle;
   }
 
   public ColorPickerPreference(Context context) {

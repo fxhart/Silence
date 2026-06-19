@@ -19,10 +19,11 @@ package org.smssecure.smssecure.mms;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.telephony.SmsManager;
 import android.util.Log;
 
@@ -67,9 +68,27 @@ public class IncomingLollipopMmsConnection extends LollipopMmsConnection impleme
 
       Log.w(TAG, "downloading multimedia from " + contentLocation + " to " + pointer.getUri());
 
+      // Grant write access to all parties that touch the URI:
+      // - "android" = system_server (MmsServiceBroker runs here, UID 1000)
+      // - "com.android.phone" = MmsService process (Android 10+)
+      // - "com.android.mms.service" = legacy MmsService package name (pre-10 / OEMs)
+      getContext().grantUriPermission("android",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      getContext().grantUriPermission("com.android.phone",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      getContext().grantUriPermission("com.android.mms.service",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
       SmsManager smsManager;
 
-      if (VERSION.SDK_INT >= 22 && subscriptionId != -1) {
+      if (VERSION.SDK_INT >= 31) {
+        smsManager = subscriptionId != -1
+            ? SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+            : getContext().getSystemService(SmsManager.class);
+      } else if (VERSION.SDK_INT >= 22 && subscriptionId != -1) {
         smsManager = SmsManager.getSmsManagerForSubscriptionId(subscriptionId);
       } else {
         smsManager = SmsManager.getDefault();
@@ -82,6 +101,9 @@ public class IncomingLollipopMmsConnection extends LollipopMmsConnection impleme
                                            getPendingIntent());
 
       waitForResult();
+
+      getContext().revokeUriPermission(pointer.getUri(),
+                                       Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
       Util.copy(pointer.getInputStream(), baos);

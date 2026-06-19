@@ -10,11 +10,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.BitmapFactory;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
-import android.support.v4.app.NotificationCompat;
+import androidx.core.app.NotificationCompat;
 import android.util.Log;
 
 import org.smssecure.smssecure.ConversationListActivity;
@@ -80,7 +81,11 @@ public class ApplicationMigrationService extends Service
     IntentFilter filter = new IntentFilter();
     filter.addAction(COMPLETED_ACTION);
 
-    registerReceiver(completedReceiver, filter);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      registerReceiver(completedReceiver, filter, RECEIVER_NOT_EXPORTED);
+    } else {
+      registerReceiver(completedReceiver, filter);
+    }
   }
 
   private void unregisterCompletedReceiver() {
@@ -135,7 +140,7 @@ public class ApplicationMigrationService extends Service
     builder.setContentText(getString(R.string.ApplicationMigrationService_import_in_progress));
     builder.setOngoing(true);
     builder.setProgress(100, 0, false);
-    builder.setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, ConversationListActivity.class), 0));
+    builder.setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, ConversationListActivity.class), PendingIntent.FLAG_IMMUTABLE));
 
     stopForeground(true);
     startForeground(4242, builder.build());
@@ -191,7 +196,7 @@ public class ApplicationMigrationService extends Service
       builder.setSmallIcon(R.drawable.icon_notification);
       builder.setContentTitle(context.getString(R.string.ApplicationMigrationService_import_complete));
       builder.setContentText(context.getString(R.string.ApplicationMigrationService_system_database_import_is_complete));
-      builder.setContentIntent(PendingIntent.getActivity(context, 0, new Intent(context, ConversationListActivity.class), 0));
+      builder.setContentIntent(PendingIntent.getActivity(context, 0, new Intent(context, ConversationListActivity.class), PendingIntent.FLAG_IMMUTABLE));
       builder.setWhen(System.currentTimeMillis());
       builder.setDefaults(Notification.DEFAULT_VIBRATE);
       builder.setAutoCancel(true);

@@ -21,6 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.util.Log;
 
 import org.smssecure.smssecure.util.Util;
@@ -58,7 +59,11 @@ public abstract class LollipopMmsConnection extends BroadcastReceiver {
   }
 
   protected void beginTransaction() {
-    getContext().getApplicationContext().registerReceiver(this, new IntentFilter(action));
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      getContext().getApplicationContext().registerReceiver(this, new IntentFilter(action), Context.RECEIVER_EXPORTED);
+    } else {
+      getContext().getApplicationContext().registerReceiver(this, new IntentFilter(action));
+    }
   }
 
   protected void endTransaction() {
@@ -77,7 +82,9 @@ public abstract class LollipopMmsConnection extends BroadcastReceiver {
   }
 
   protected PendingIntent getPendingIntent() {
-    return PendingIntent.getBroadcast(getContext(), 1, new Intent(action), PendingIntent.FLAG_ONE_SHOT);
+    Intent intent = new Intent(action);
+    intent.setPackage(getContext().getPackageName());
+    return PendingIntent.getBroadcast(getContext(), 1, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_MUTABLE);
   }
 
   protected Context getContext() {

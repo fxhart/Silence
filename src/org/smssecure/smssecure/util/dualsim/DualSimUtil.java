@@ -6,7 +6,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.support.v4.app.NotificationCompat;
+import androidx.core.app.NotificationCompat;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.util.Log;
@@ -125,7 +125,7 @@ public class DualSimUtil {
                                     .setVisibility(Notification.VISIBILITY_PUBLIC)
                                     .setContentIntent(PendingIntent.getActivity(context.getApplicationContext(), 0,
                                                                                 targetIntent,
-                                                                                PendingIntent.FLAG_UPDATE_CURRENT))
+                                                                                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE))
                                     .build();
     ServiceUtil.getNotificationManager(context).notify(NOTIFICATION_ID, notification);
   }

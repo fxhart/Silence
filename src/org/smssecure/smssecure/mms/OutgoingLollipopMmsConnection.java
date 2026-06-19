@@ -22,8 +22,8 @@ import android.content.Intent;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.telephony.SmsManager;
 import android.util.Log;
 
@@ -69,9 +69,27 @@ public class OutgoingLollipopMmsConnection extends LollipopMmsConnection impleme
       MmsBodyProvider.Pointer pointer = MmsBodyProvider.makeTemporaryPointer(getContext());
       Util.copy(new ByteArrayInputStream(pduBytes), pointer.getOutputStream());
 
+      // Grant read access to all parties that touch the URI:
+      // - "android" = system_server (MmsServiceBroker.importMmsFile runs here, UID 1000)
+      // - "com.android.phone" = MmsService process (Android 10+)
+      // - "com.android.mms.service" = legacy MmsService package name (pre-10 / OEMs)
+      getContext().grantUriPermission("android",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      getContext().grantUriPermission("com.android.phone",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      getContext().grantUriPermission("com.android.mms.service",
+                                      pointer.getUri(),
+                                      Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
       SmsManager smsManager;
 
-      if (VERSION.SDK_INT >= 22 && subscriptionId != -1) {
+      if (VERSION.SDK_INT >= 31) {
+        smsManager = subscriptionId != -1
+            ? SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+            : getContext().getSystemService(SmsManager.class);
+      } else if (VERSION.SDK_INT >= 22 && subscriptionId != -1) {
         smsManager = SmsManager.getSmsManagerForSubscriptionId(subscriptionId);
       } else {
         smsManager = SmsManager.getDefault();
@@ -97,6 +115,8 @@ public class OutgoingLollipopMmsConnection extends LollipopMmsConnection impleme
       waitForResult();
 
       Log.w(TAG, "MMS broadcast received and processed.");
+      getContext().revokeUriPermission(pointer.getUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      // No need to revoke per-package grants — revokeUriPermission clears all grants on that URI.
       pointer.close();
 
       if (response == null) {

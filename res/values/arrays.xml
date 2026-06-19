@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+  <integer-array name="color_picker_default_colors">
+    <item>@color/red_500</item>
+    <item>@color/pink_500</item>
+    <item>@color/purple_500</item>
+    <item>@color/deep_purple_500</item>
+    <item>@color/indigo_500</item>
+    <item>@color/blue_500</item>
+    <item>@color/teal_500</item>
+    <item>@color/green_500</item>
+    <item>@color/orange_500</item>
+    <item>@color/brown_500</item>
+  </integer-array>
+
   <string-array name="language_entries">
       <item>@string/preferences__default</item>
       <item>English</item>

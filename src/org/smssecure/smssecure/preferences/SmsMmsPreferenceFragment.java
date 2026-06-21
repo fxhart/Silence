@@ -63,14 +63,24 @@ public class SmsMmsPreferenceFragment extends CorrectedPreferenceFragment {
 
       if (Util.isDefaultSmsProvider(getActivity())) {
         defaultPreference.setIntent(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+        defaultPreference.setOnPreferenceClickListener(null);
         defaultPreference.setTitle(getString(R.string.ApplicationPreferencesActivity_sms_enabled));
         defaultPreference.setSummary(getString(R.string.ApplicationPreferencesActivity_tap_to_change_your_default_sms_app));
       } else {
-        Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
-        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, getActivity().getPackageName());
-        defaultPreference.setIntent(intent);
         defaultPreference.setTitle(getString(R.string.ApplicationPreferencesActivity_sms_disabled));
         defaultPreference.setSummary(getString(R.string.ApplicationPreferencesActivity_tap_to_make_silence_your_default_sms_app));
+        if (Build.VERSION.SDK_INT >= 29) {
+          // On Android 10+, ACTION_CHANGE_DEFAULT is gone and createRequestRoleIntent
+          // silently no-ops for sideloaded apps on GrapheneOS. Open Default Apps
+          // settings directly so the user can set Silence as the SMS app.
+          defaultPreference.setIntent(new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS));
+          defaultPreference.setOnPreferenceClickListener(null);
+        } else {
+          Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+          intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, getActivity().getPackageName());
+          defaultPreference.setIntent(intent);
+          defaultPreference.setOnPreferenceClickListener(null);
+        }
       }
     } else if (defaultPreference != null) {
       preferenceScreen.removePreference(defaultPreference);

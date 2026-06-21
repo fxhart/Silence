@@ -57,7 +57,8 @@ public class WelcomeActivity extends BaseActionBarActivity {
                  Manifest.permission.RECEIVE_SMS,
                  Manifest.permission.RECEIVE_MMS,
                  Manifest.permission.READ_SMS,
-                 Manifest.permission.SEND_SMS)
+                 Manifest.permission.SEND_SMS,
+                 "android.permission.POST_NOTIFICATIONS")
         .ifNecessary()
         .withRationaleDialog(getString(R.string.WelcomeActivity_silence_needs_access_to_your_contacts_phone_status_and_sms),
           R.drawable.ic_contacts_white_48dp, R.drawable.ic_phone_white_48dp)

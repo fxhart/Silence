@@ -302,7 +302,16 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
     Log.w(TAG, "onActivityResult called: " + reqCode + ", " + resultCode + " , " + data);
     super.onActivityResult(reqCode, resultCode, data);
 
-    if (data == null && reqCode != TAKE_PHOTO || resultCode != RESULT_OK) return;
+    // TAKE_PHOTO: GrapheneOS camera returns RESULT_CANCELED even on success when using
+    // EXTRA_OUTPUT — check captureUri existence in the switch case instead of here.
+    if (reqCode == TAKE_PHOTO) {
+      if (attachmentManager.getCaptureUri() != null) {
+        setMedia(attachmentManager.getCaptureUri(), MediaType.IMAGE);
+      }
+      return;
+    }
+
+    if (data == null || resultCode != RESULT_OK) return;
 
     switch (reqCode) {
     case PICK_IMAGE:
@@ -317,11 +326,6 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
       break;
     case PICK_CONTACT_INFO:
       addAttachmentContactInfo(data.getData());
-      break;
-    case TAKE_PHOTO:
-      if (attachmentManager.getCaptureUri() != null) {
-        setMedia(attachmentManager.getCaptureUri(), MediaType.IMAGE);
-      }
       break;
     case ADD_CONTACT:
       recipients = RecipientFactory.getRecipientsForIds(ConversationActivity.this, recipients.getIds(), true);

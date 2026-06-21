@@ -85,7 +85,11 @@ public class KeyCachingService extends Service {
         MasterSecret masterSecret = MasterSecretUtil.getMasterSecret(context, MasterSecretUtil.UNENCRYPTED_PASSPHRASE);
         Intent       intent       = new Intent(context, KeyCachingService.class);
 
-        context.startService(intent);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          context.startForegroundService(intent);
+        } else {
+          context.startService(intent);
+        }
 
         return masterSecret;
       } catch (InvalidPassphraseException e) {
@@ -247,7 +251,11 @@ public class KeyCachingService extends Service {
     builder.setContentIntent(buildLaunchIntent());
 
     stopForeground(true);
-    startForeground(SERVICE_RUNNING_ID, builder.build());
+    if (Build.VERSION.SDK_INT >= 29) {
+      startForeground(SERVICE_RUNNING_ID, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+    } else {
+      startForeground(SERVICE_RUNNING_ID, builder.build());
+    }
   }
 
   private void foregroundServiceICS() {
@@ -328,12 +336,20 @@ public class KeyCachingService extends Service {
   public static void registerPassphraseActivityStarted(Context activity) {
     Intent intent = new Intent(activity, KeyCachingService.class);
     intent.setAction(KeyCachingService.ACTIVITY_START_EVENT);
-    activity.startService(intent);
+    try {
+      activity.startService(intent);
+    } catch (IllegalStateException e) {
+      Log.w("KeyCachingService", "Could not signal activity start (app in background): " + e.getMessage());
+    }
   }
 
   public static void registerPassphraseActivityStopped(Context activity) {
     Intent intent = new Intent(activity, KeyCachingService.class);
     intent.setAction(KeyCachingService.ACTIVITY_STOP_EVENT);
-    activity.startService(intent);
+    try {
+      activity.startService(intent);
+    } catch (IllegalStateException e) {
+      Log.w("KeyCachingService", "Could not signal activity stop (app in background): " + e.getMessage());
+    }
   }
 }

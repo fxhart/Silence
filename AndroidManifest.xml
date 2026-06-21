@@ -4,6 +4,18 @@
 
     <uses-sdk tools:overrideLibrary="com.amulyakhare.textdrawable,com.astuetz.pagerslidingtabstrip,pl.tajchert.waitingdots,android.support.v13,com.davemorrissey.labs.subscaleview,,com.klinker.android.send_message"/>
 
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+        </intent>
+    </queries>
+
     <permission android:name="org.smssecure.smssecure.ACCESS_SECRETS"
                 android:label="Access to Silence Secrets"
                 android:protectionLevel="signature" />
@@ -27,6 +39,7 @@
     <uses-permission android:name="android.permission.READ_SMS"/>
     <uses-permission android:name="android.permission.SEND_SMS"/>
     <uses-permission android:name="android.permission.WRITE_SMS"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -35,6 +48,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application android:name=".ApplicationContext"
                  android:icon="@drawable/icon"
@@ -281,8 +296,10 @@
     <activity android:name=".ExitActivity"
               android:theme="@android:style/Theme.NoDisplay" />
 
-    <service android:enabled="true" android:name=".service.ApplicationMigrationService"/>
-    <service android:enabled="true" android:name=".service.KeyCachingService"/>
+    <service android:enabled="true" android:name=".service.ApplicationMigrationService"
+             android:foregroundServiceType="dataSync"/>
+    <service android:enabled="true" android:name=".service.KeyCachingService"
+             android:foregroundServiceType="dataSync"/>
 
     <service android:name=".service.QuickResponseService"
              android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE"

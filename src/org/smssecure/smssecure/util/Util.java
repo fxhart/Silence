@@ -297,8 +297,17 @@ public class Util {
 
   @SuppressLint("NewApi")
   public static boolean isDefaultSmsProvider(Context context){
-    return (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) ||
-      (context.getPackageName().equals(Telephony.Sms.getDefaultSmsPackage(context)));
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return true;
+    // On Android 10+ the default SMS app is tracked via the Role system; the old
+    // Telephony.Sms.getDefaultSmsPackage() may return null on some devices.
+    if (Build.VERSION.SDK_INT >= 29) {
+      android.app.role.RoleManager roleManager =
+          (android.app.role.RoleManager) context.getSystemService(android.app.role.RoleManager.class);
+      if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_SMS)) {
+        return roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_SMS);
+      }
+    }
+    return context.getPackageName().equals(Telephony.Sms.getDefaultSmsPackage(context));
   }
 
   public static int getCurrentApkReleaseVersion(Context context) {

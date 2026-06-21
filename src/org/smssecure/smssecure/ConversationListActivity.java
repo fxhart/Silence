@@ -35,6 +35,7 @@ import android.view.SubMenu;
 import org.smssecure.smssecure.crypto.MasterSecret;
 import org.smssecure.smssecure.database.DatabaseFactory;
 import org.smssecure.smssecure.notifications.MessageNotifier;
+import org.smssecure.smssecure.permissions.Permissions;
 import org.smssecure.smssecure.recipients.RecipientFactory;
 import org.smssecure.smssecure.recipients.Recipients;
 import org.smssecure.smssecure.service.KeyCachingService;
@@ -83,6 +84,17 @@ public class ConversationListActivity extends PassphraseRequiredActionBarActivit
     super.onResume();
     dynamicTheme.onResume(this);
     dynamicLanguage.onResume(this);
+    if (Build.VERSION.SDK_INT >= 33) {
+      Permissions.with(this)
+                 .request("android.permission.POST_NOTIFICATIONS")
+                 .ifNecessary()
+                 .execute();
+    }
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    Permissions.onRequestPermissionsResult(this, requestCode, permissions, grantResults);
   }
 
   @Override

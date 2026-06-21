@@ -143,7 +143,11 @@ public class ApplicationMigrationService extends Service
     builder.setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, ConversationListActivity.class), PendingIntent.FLAG_IMMUTABLE));
 
     stopForeground(true);
-    startForeground(4242, builder.build());
+    if (android.os.Build.VERSION.SDK_INT >= 29) {
+      startForeground(4242, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+    } else {
+      startForeground(4242, builder.build());
+    }
 
     return builder;
   }

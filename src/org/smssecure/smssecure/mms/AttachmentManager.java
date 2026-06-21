@@ -274,6 +274,7 @@ public class AttachmentManager {
         }
         Log.w(TAG, "captureUri path is " + captureUri.getPath());
         captureIntent.putExtra(MediaStore.EXTRA_OUTPUT, captureUri);
+        captureIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         activity.startActivityForResult(captureIntent, requestCode);
       }
     } catch (IOException ioe) {

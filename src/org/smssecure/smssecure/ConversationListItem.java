@@ -24,6 +24,7 @@ import android.graphics.drawable.RippleDrawable;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import android.util.AttributeSet;
@@ -82,7 +83,7 @@ public class ConversationListItem extends RelativeLayout
   private final @DrawableRes int readBackground;
   private final @DrawableRes int unreadBackround;
 
-  private final Handler handler = new Handler();
+  private final Handler handler = new Handler(Looper.getMainLooper());
   private int distributionType;
 
   public ConversationListItem(Context context) {

@@ -16,7 +16,6 @@
  */
 package org.smssecure.smssecure;
 
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -265,14 +264,16 @@ public class ConversationListFragment extends Fragment
 
         if (!selectedConversations.isEmpty()) {
           new AsyncTask<Void, Void, Void>() {
-            private ProgressDialog dialog;
+            private AlertDialog dialog;
 
             @Override
             protected void onPreExecute() {
-              dialog = ProgressDialog.show(getActivity(),
-                                           getActivity().getString(R.string.ConversationListFragment_deleting),
-                                           getActivity().getString(R.string.ConversationListFragment_deleting_selected_conversations),
-                                           true, false);
+              dialog = new AlertDialog.Builder(getActivity())
+                  .setTitle(R.string.ConversationListFragment_deleting)
+                  .setMessage(R.string.ConversationListFragment_deleting_selected_conversations)
+                  .setCancelable(false)
+                  .create();
+              dialog.show();
             }
 
             @Override
@@ -326,18 +327,20 @@ public class ConversationListFragment extends Fragment
           final MasterCipher masterCipher = new MasterCipher(masterSecret);
 
           new AsyncTask<Void, Void, Void>() {
-            private ProgressDialog dialog;
-            private boolean        isSingleConversation;
-            private boolean        isSecureDestination;
-            private DraftDatabase  draftDatabase;
-            private Recipients     recipients;
+            private AlertDialog dialog;
+            private boolean     isSingleConversation;
+            private boolean     isSecureDestination;
+            private DraftDatabase draftDatabase;
+            private Recipients  recipients;
 
             @Override
             protected void onPreExecute() {
-              dialog = ProgressDialog.show(context,
-                                           context.getString(R.string.ConversationListFragment_sending),
-                                           context.getString(R.string.ConversationListFragment_sending_selected_drafts),
-                                           true, false);
+              dialog = new AlertDialog.Builder(context)
+                  .setTitle(R.string.ConversationListFragment_sending)
+                  .setMessage(R.string.ConversationListFragment_sending_selected_drafts)
+                  .setCancelable(false)
+                  .create();
+              dialog.show();
             }
 
             @Override

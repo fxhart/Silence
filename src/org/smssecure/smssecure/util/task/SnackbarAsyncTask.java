@@ -1,9 +1,13 @@
 package org.smssecure.smssecure.util.task;
 
-import android.app.ProgressDialog;
+import android.app.AlertDialog;
 import android.os.AsyncTask;
+import android.widget.ProgressBar;
+
 import androidx.annotation.Nullable;
+
 import com.google.android.material.snackbar.Snackbar;
+
 import android.view.View;
 
 public abstract class SnackbarAsyncTask<Params>
@@ -18,8 +22,8 @@ public abstract class SnackbarAsyncTask<Params>
   private final int     snackbarDuration;
   private final boolean showProgress;
 
-  private @Nullable Params         reversibleParameter;
-  private @Nullable ProgressDialog progressDialog;
+  private @Nullable Params       reversibleParameter;
+  private @Nullable AlertDialog  progressDialog;
 
   public SnackbarAsyncTask(View view,
                            String snackbarText,
@@ -36,16 +40,29 @@ public abstract class SnackbarAsyncTask<Params>
     this.showProgress        = showProgress;
   }
 
+  private AlertDialog buildSpinner() {
+    ProgressBar pb = new ProgressBar(view.getContext());
+    pb.setIndeterminate(true);
+    return new AlertDialog.Builder(view.getContext())
+        .setView(pb)
+        .setCancelable(false)
+        .create();
+  }
+
   @Override
   protected void onPreExecute() {
-    if (this.showProgress) this.progressDialog = ProgressDialog.show(view.getContext(), "", "", true);
-    else                   this.progressDialog = null;
+    if (this.showProgress) {
+      this.progressDialog = buildSpinner();
+      this.progressDialog.show();
+    } else {
+      this.progressDialog = null;
+    }
   }
 
   @SafeVarargs
   @Override
   protected final Void doInBackground(Params... params) {
-    this.reversibleParameter = params != null && params.length > 0 ?params[0] : null;
+    this.reversibleParameter = params != null && params.length > 0 ? params[0] : null;
     executeAction(reversibleParameter);
     return null;
   }
@@ -66,10 +83,14 @@ public abstract class SnackbarAsyncTask<Params>
   @Override
   public void onClick(View v) {
     new AsyncTask<Void, Void, Void>() {
+      private AlertDialog reverseDialog;
+
       @Override
       protected void onPreExecute() {
-        if (showProgress) progressDialog = ProgressDialog.show(view.getContext(), "", "", true);
-        else              progressDialog = null;
+        if (showProgress) {
+          reverseDialog = buildSpinner();
+          reverseDialog.show();
+        }
       }
 
       @Override
@@ -80,9 +101,8 @@ public abstract class SnackbarAsyncTask<Params>
 
       @Override
       protected void onPostExecute(Void result) {
-        if (showProgress && progressDialog != null) {
-          progressDialog.dismiss();
-          progressDialog = null;
+        if (showProgress && reverseDialog != null) {
+          reverseDialog.dismiss();
         }
       }
     }.execute();

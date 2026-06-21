@@ -94,11 +94,11 @@ public class MmsRadio {
     Log.w(TAG, "startUsingNetworkFeature status: " + status);
 
     if (status == APN_ALREADY_ACTIVE) {
-      wakeLock.acquire();
+      wakeLock.acquire(5 * 60 * 1000L);
       connectedCounter++;
       return;
     } else {
-      wakeLock.acquire();
+      wakeLock.acquire(5 * 60 * 1000L);
       connectedCounter++;
 
       if (connectivityListener == null) {

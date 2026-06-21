@@ -11,6 +11,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +36,12 @@ public class XmlBackup {
     this.parser = XmlPullParserFactory.newInstance().newPullParser();
     parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
     parser.setInput(new FileInputStream(path), null);
+  }
+
+  public XmlBackup(InputStream in) throws XmlPullParserException {
+    this.parser = XmlPullParserFactory.newInstance().newPullParser();
+    parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
+    parser.setInput(in, null);
   }
 
   public XmlBackupItem getNext() throws IOException, XmlPullParserException {

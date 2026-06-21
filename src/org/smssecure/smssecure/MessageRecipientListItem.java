@@ -19,6 +19,7 @@ package org.smssecure.smssecure;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
@@ -54,7 +55,7 @@ public class MessageRecipientListItem extends RelativeLayout
   private Button          resendButton;
   private AvatarImageView contactPhotoImage;
 
-  private final Handler handler = new Handler();
+  private final Handler handler = new Handler(Looper.getMainLooper());
 
   public MessageRecipientListItem(Context context) {
     super(context);

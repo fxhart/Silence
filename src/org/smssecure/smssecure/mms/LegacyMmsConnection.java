@@ -208,7 +208,13 @@ public abstract class LegacyMmsConnection {
   }
 
   protected List<Header> getBaseHeaders() {
-    final String                number    = TelephonyUtil.getManager(context).getLine1Number(); ;
+    String numberTmp;
+    try {
+      numberTmp = TelephonyUtil.getManager(context).getLine1Number();
+    } catch (SecurityException e) {
+      numberTmp = null;
+    }
+    final String number = numberTmp;
 
     return new LinkedList<Header>() {{
       add(new BasicHeader("Accept", "*/*, application/vnd.wap.mms-message, application/vnd.wap.sic"));

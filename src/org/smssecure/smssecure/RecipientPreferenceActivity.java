@@ -10,6 +10,7 @@ import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -152,7 +153,7 @@ public class RecipientPreferenceActivity extends PassphraseRequiredActionBarActi
       implements Recipients.RecipientsModifiedListener
   {
 
-    private final Handler handler = new Handler();
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     private Recipients recipients;
 

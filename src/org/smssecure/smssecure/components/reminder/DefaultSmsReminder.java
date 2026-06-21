@@ -3,7 +3,9 @@ package org.smssecure.smssecure.components.reminder;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Build.VERSION_CODES;
+import android.provider.Settings;
 import android.provider.Telephony;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -24,8 +26,13 @@ public class DefaultSmsReminder extends Reminder {
       @Override
       public void onClick(View v) {
         SilencePreferences.setPromptedDefaultSmsProvider(context, true);
-        Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
-        intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, context.getPackageName());
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 29) {
+          intent = new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS);
+        } else {
+          intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+          intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, context.getPackageName());
+        }
         context.startActivity(intent);
       }
     };

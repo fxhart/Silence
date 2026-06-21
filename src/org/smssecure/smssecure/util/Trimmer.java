@@ -1,8 +1,9 @@
 package org.smssecure.smssecure.util;
 
-import android.app.ProgressDialog;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import org.smssecure.smssecure.R;
@@ -16,8 +17,9 @@ public class Trimmer {
   }
 
   private static class TrimmingProgressTask extends AsyncTask<Integer, Integer, Void> implements ThreadDatabase.ProgressListener {
-    private ProgressDialog progressDialog;
-    private Context context;
+    private AlertDialog  progressDialog;
+    private ProgressBar  progressBar;
+    private Context      context;
 
     public TrimmingProgressTask(Context context) {
       this.context = context;
@@ -25,13 +27,18 @@ public class Trimmer {
 
     @Override
     protected void onPreExecute() {
-      progressDialog = new ProgressDialog(context);
-      progressDialog.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-      progressDialog.setCancelable(false);
-      progressDialog.setIndeterminate(false);
-      progressDialog.setTitle(R.string.trimmer__deleting);
-      progressDialog.setMessage(context.getString(R.string.trimmer__deleting_old_messages));
-      progressDialog.setMax(100);
+      progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
+      progressBar.setMax(100);
+      progressBar.setIndeterminate(false);
+      int padding = Math.round(16 * context.getResources().getDisplayMetrics().density);
+      progressBar.setPadding(padding, padding, padding, padding);
+
+      progressDialog = new AlertDialog.Builder(context)
+          .setTitle(R.string.trimmer__deleting)
+          .setMessage(R.string.trimmer__deleting_old_messages)
+          .setCancelable(false)
+          .setView(progressBar)
+          .create();
       progressDialog.show();
     }
 
@@ -45,8 +52,7 @@ public class Trimmer {
     protected void onProgressUpdate(Integer... progress) {
       double count = progress[1];
       double index = progress[0];
-
-      progressDialog.setProgress((int)Math.round((index / count) * 100.0));
+      progressBar.setProgress((int) Math.round((index / count) * 100.0));
     }
 
     @Override

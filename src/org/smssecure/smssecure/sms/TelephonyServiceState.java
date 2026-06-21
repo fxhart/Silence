@@ -1,10 +1,18 @@
 package org.smssecure.smssecure.sms;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.ServiceState;
+import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
+
+import androidx.annotation.RequiresApi;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class TelephonyServiceState {
 
@@ -28,17 +36,23 @@ public class TelephonyServiceState {
 
     @Override
     public void run() {
-      Looper         looper   = initializeLooper();
-      ListenCallback callback = new ListenCallback(looper);
+      TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
 
-      TelephonyManager telephonyManager = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
-      telephonyManager.listen(callback, PhoneStateListener.LISTEN_SERVICE_STATE);
-
-      Looper.loop();
-
-      telephonyManager.listen(callback, PhoneStateListener.LISTEN_NONE);
-
-      set(callback.isConnected());
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        ServiceStateTelephonyCallback callback = new ServiceStateTelephonyCallback();
+        telephonyManager.registerTelephonyCallback(Executors.newSingleThreadExecutor(), callback);
+        set(callback.awaitAndIsConnected());
+        telephonyManager.unregisterTelephonyCallback(callback);
+      } else {
+        Looper         looper   = initializeLooper();
+        ListenCallback callback = new ListenCallback(looper);
+        //noinspection deprecation
+        telephonyManager.listen(callback, PhoneStateListener.LISTEN_SERVICE_STATE);
+        Looper.loop();
+        //noinspection deprecation
+        telephonyManager.listen(callback, PhoneStateListener.LISTEN_NONE);
+        set(callback.isConnected());
+      }
     }
 
     private Looper initializeLooper() {
@@ -70,6 +84,30 @@ public class TelephonyServiceState {
     }
   }
 
+  @RequiresApi(Build.VERSION_CODES.S)
+  private static class ServiceStateTelephonyCallback extends TelephonyCallback
+      implements TelephonyCallback.ServiceStateListener {
+
+    private final CountDownLatch latch = new CountDownLatch(1);
+    private volatile boolean connected;
+
+    @Override
+    public void onServiceStateChanged(ServiceState serviceState) {
+      this.connected = serviceState.getState() == ServiceState.STATE_IN_SERVICE;
+      latch.countDown();
+    }
+
+    public boolean awaitAndIsConnected() {
+      try {
+        latch.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      return connected;
+    }
+  }
+
+  @SuppressWarnings("deprecation")
   private static class ListenCallback extends PhoneStateListener {
 
     private final    Looper  looper;

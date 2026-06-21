@@ -39,7 +39,8 @@ public class TelephonyUtil {
 
   public static String getApn(final Context context) {
     final ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-    return cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_MMS).getExtraInfo();
+    NetworkInfo info = cm.getNetworkInfo(ConnectivityManager.TYPE_MOBILE_MMS);
+    return info != null ? info.getExtraInfo() : null;
   }
 
   public static boolean isMyPhoneNumber(final Context context, String number){
@@ -48,15 +49,33 @@ public class TelephonyUtil {
 
   public static String getPhoneNumber(final Context context){
     final TelephonyManager tm = (TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE);
-    return tm.getLine1Number();
+    try {
+      return tm.getLine1Number();
+    } catch (SecurityException e) {
+      Log.w(TAG, "No permission to read line1 number", e);
+      return null;
+    }
   }
 
+  @SuppressWarnings("deprecation")
   public static NetworkInfo getNetworkInfo(final Context context) {
     return ServiceUtil.getConnectivityManager(context).getActiveNetworkInfo();
   }
 
   public static boolean isConnectedRoaming(final Context context) {
-    NetworkInfo info = getNetworkInfo(context);
-    return info != null && info.isConnected() && info.isRoaming() && info.getType() == ConnectivityManager.TYPE_MOBILE;
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+      android.net.Network active = ServiceUtil.getConnectivityManager(context).getActiveNetwork();
+      if (active == null) return false;
+      android.net.NetworkCapabilities caps =
+          ServiceUtil.getConnectivityManager(context).getNetworkCapabilities(active);
+      android.net.NetworkInfo info = ServiceUtil.getConnectivityManager(context).getNetworkInfo(active);
+      return caps != null
+          && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)
+          && info != null && info.isRoaming();
+    } else {
+      NetworkInfo info = getNetworkInfo(context);
+      return info != null && info.isConnected() && info.isRoaming()
+          && info.getType() == ConnectivityManager.TYPE_MOBILE;
+    }
   }
 }

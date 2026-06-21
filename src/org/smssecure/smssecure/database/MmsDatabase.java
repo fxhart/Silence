@@ -227,7 +227,11 @@ public class MmsDatabase extends MessagingDatabase {
     if (SilencePreferences.isPushRegistered(context)) {
       localNumber = SilencePreferences.getLocalNumber(context);
     } else {
-      localNumber = ServiceUtil.getTelephonyManager(context).getLine1Number();
+      try {
+        localNumber = ServiceUtil.getTelephonyManager(context).getLine1Number();
+      } catch (SecurityException e) {
+        localNumber = null;
+      }
     }
 
     for (String cc : retrieved.getAddresses().getCc()) {

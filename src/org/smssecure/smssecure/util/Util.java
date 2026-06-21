@@ -216,8 +216,13 @@ public class Util {
   })
   @SuppressLint("MissingPermission")
   public static String getDeviceE164Number(Context context) {
-    String localNumber = ((TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE))
-        .getLine1Number();
+    String localNumber;
+    try {
+      localNumber = ((TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE))
+          .getLine1Number();
+    } catch (SecurityException e) {
+      return null;
+    }
 
     if (!TextUtils.isEmpty(localNumber) && !localNumber.startsWith("+"))
     {

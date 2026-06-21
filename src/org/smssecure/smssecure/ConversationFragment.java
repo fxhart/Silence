@@ -35,7 +35,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ItemAnimator.ItemAnimatorFinishedListener;
 import androidx.recyclerview.widget.RecyclerView.OnScrollListener;
-import android.text.ClipboardManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -296,7 +297,7 @@ public class ConversationFragment extends Fragment
     String result = bodyBuilder.toString();
 
     if (!TextUtils.isEmpty(result))
-        clipboard.setText(result);
+        clipboard.setPrimaryClip(ClipData.newPlainText("", result));
   }
 
   private void handleDeleteMessages(final Set<MessageRecord> messageRecords) {

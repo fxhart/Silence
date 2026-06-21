@@ -1,10 +1,13 @@
 package org.smssecure.smssecure.util;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface.OnClickListener;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import android.util.Log;
@@ -33,7 +36,6 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
 
   private final WeakReference<Context> contextReference;
   private final WeakReference<MasterSecret> masterSecretReference;
-
   private final int attachmentCount;
 
   public SaveAttachmentTask(Context context, MasterSecret masterSecret) {
@@ -59,12 +61,12 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
       Context context           = contextReference.get();
       MasterSecret masterSecret = masterSecretReference.get();
 
-      if (!Environment.getExternalStorageDirectory().canWrite()) {
-        return WRITE_ACCESS_FAILURE;
-      }
+      if (context == null) return FAILURE;
 
-      if (context == null) {
-        return FAILURE;
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        if (!Environment.getExternalStorageDirectory().canWrite()) {
+          return WRITE_ACCESS_FAILURE;
+        }
       }
 
       for (Attachment attachment : attachments) {
@@ -81,20 +83,72 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
   }
 
   private boolean saveAttachment(Context context, MasterSecret masterSecret, Attachment attachment) throws IOException {
-    String contentType      = MediaUtil.getCorrectedMimeType(attachment.contentType);
-    File mediaFile          = constructOutputFile(contentType, attachment.date);
+    String contentType = MediaUtil.getCorrectedMimeType(attachment.contentType);
     InputStream inputStream = PartAuthority.getAttachmentStream(context, masterSecret, attachment.uri);
 
-    if (inputStream == null) {
-      return false;
+    if (inputStream == null) return false;
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      return saveAttachmentViaMediaStore(context, inputStream, contentType, attachment.date);
+    } else {
+      return saveAttachmentLegacy(context, inputStream, contentType, attachment.date);
+    }
+  }
+
+  private boolean saveAttachmentViaMediaStore(Context context, InputStream inputStream,
+                                              String contentType, long date) throws IOException
+  {
+    Uri collectionUri;
+    ContentValues values = new ContentValues();
+
+    SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd-HHmmss");
+    MimeTypeMap mimeTypeMap = MimeTypeMap.getSingleton();
+    String extension = mimeTypeMap.getExtensionFromMimeType(contentType);
+    if (extension == null) extension = "attach";
+    String fileName = "silence-" + dateFormatter.format(date) + "." + extension;
+
+    if (contentType.startsWith("video/")) {
+      collectionUri = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+      values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
+      values.put(MediaStore.Video.Media.MIME_TYPE, contentType);
+      values.put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES);
+    } else if (contentType.startsWith("audio/")) {
+      collectionUri = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+      values.put(MediaStore.Audio.Media.DISPLAY_NAME, fileName);
+      values.put(MediaStore.Audio.Media.MIME_TYPE, contentType);
+      values.put(MediaStore.Audio.Media.RELATIVE_PATH, Environment.DIRECTORY_MUSIC);
+    } else if (contentType.startsWith("image/")) {
+      collectionUri = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+      values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+      values.put(MediaStore.Images.Media.MIME_TYPE, contentType);
+      values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+    } else {
+      collectionUri = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+      values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+      values.put(MediaStore.Downloads.MIME_TYPE, contentType);
+      values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
     }
 
+    Uri itemUri = context.getContentResolver().insert(collectionUri, values);
+    if (itemUri == null) return false;
+
+    try (OutputStream outputStream = context.getContentResolver().openOutputStream(itemUri)) {
+      if (outputStream == null) return false;
+      Util.copy(inputStream, outputStream);
+    }
+
+    return true;
+  }
+
+  private boolean saveAttachmentLegacy(Context context, InputStream inputStream,
+                                       String contentType, long date) throws IOException
+  {
+    File mediaFile = constructOutputFile(contentType, date);
     OutputStream outputStream = new FileOutputStream(mediaFile);
     Util.copy(inputStream, outputStream);
 
     MediaScannerConnection.scanFile(context, new String[]{mediaFile.getAbsolutePath()},
                                     new String[]{contentType}, null);
-
     return true;
   }
 
@@ -140,10 +194,10 @@ public class SaveAttachmentTask extends ProgressDialogAsyncTask<SaveAttachmentTa
 
     if (!outputDirectory.mkdirs()) Log.w(TAG, "mkdirs() returned false, attempting to continue");
 
-    MimeTypeMap       mimeTypeMap   = MimeTypeMap.getSingleton();
-    String            extension     = mimeTypeMap.getExtensionFromMimeType(contentType);
-    SimpleDateFormat  dateFormatter = new SimpleDateFormat("yyyy-MM-dd-HHmmss");
-    String            base          = "silence-" + dateFormatter.format(timestamp);
+    MimeTypeMap      mimeTypeMap   = MimeTypeMap.getSingleton();
+    String           extension     = mimeTypeMap.getExtensionFromMimeType(contentType);
+    SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd-HHmmss");
+    String           base          = "silence-" + dateFormatter.format(timestamp);
 
     if (extension == null) extension = "attach";
 

@@ -166,6 +166,16 @@ public class XmlBackup {
       bufferedWriter.write(String.format(OPEN_TAG_SMSES, count));
     }
 
+    public Writer(java.io.OutputStream out, int count) throws IOException {
+      bufferedWriter = new BufferedWriter(new java.io.OutputStreamWriter(out, "UTF-8"));
+
+      bufferedWriter.write(XML_HEADER);
+      bufferedWriter.newLine();
+      bufferedWriter.write(CREATED_BY);
+      bufferedWriter.newLine();
+      bufferedWriter.write(String.format(OPEN_TAG_SMSES, count));
+    }
+
     public void writeItem(XmlBackupItem item) throws IOException {
       StringBuilder stringBuilder = new StringBuilder();
 

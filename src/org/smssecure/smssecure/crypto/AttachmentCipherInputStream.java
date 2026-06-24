@@ -1,9 +1,9 @@
 package org.smssecure.smssecure.crypto;
 
 import org.smssecure.smssecure.util.Util;
-import org.whispersystems.libsignal.InvalidMacException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.InvalidMacException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import java.util.Optional;
 
 import java.io.File;
 import java.io.FileInputStream;

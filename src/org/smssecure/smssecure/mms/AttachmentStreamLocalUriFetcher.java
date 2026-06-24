@@ -11,7 +11,7 @@ import com.bumptech.glide.load.data.StreamLocalUriFetcher;
 
 import org.smssecure.smssecure.crypto.AttachmentCipherInputStream;
 import org.smssecure.smssecure.crypto.MasterSecret;
-import org.whispersystems.libsignal.util.guava.Optional;
+import java.util.Optional;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -30,7 +30,7 @@ public class AttachmentStreamLocalUriFetcher implements DataFetcher<InputStream>
   }
 
   @Override public InputStream loadData(Priority priority) throws Exception {
-    is = new AttachmentCipherInputStream(attachment, key, Optional.<byte[]>absent());
+    is = new AttachmentCipherInputStream(attachment, key, Optional.<byte[]>empty());
     return is;
   }
 

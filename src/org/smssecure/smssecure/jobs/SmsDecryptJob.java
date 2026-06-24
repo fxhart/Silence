@@ -33,14 +33,12 @@ import org.smssecure.smssecure.util.dualsim.SubscriptionInfoCompat;
 import org.smssecure.smssecure.util.dualsim.SubscriptionManagerCompat;
 import org.smssecure.smssecure.util.SilencePreferences;
 import org.whispersystems.jobqueue.JobParameters;
-import org.whispersystems.libsignal.DuplicateMessageException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.InvalidVersionException;
-import org.whispersystems.libsignal.LegacyMessageException;
-import org.whispersystems.libsignal.NoSessionException;
-import org.whispersystems.libsignal.StaleKeyExchangeException;
-import org.whispersystems.libsignal.UntrustedIdentityException;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.DuplicateMessageException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.InvalidVersionException;
+import org.signal.libsignal.protocol.LegacyMessageException;
+import org.signal.libsignal.protocol.NoSessionException;
+import org.signal.libsignal.protocol.UntrustedIdentityException;
 
 import java.io.IOException;
 import java.util.List;
@@ -103,6 +101,9 @@ public class SmsDecryptJob extends MasterSecretJob {
     } catch (LegacyMessageException e) {
       Log.w(TAG, e);
       database.markAsLegacyVersion(messageId);
+    } catch (InvalidVersionException e) {
+      Log.w(TAG, e);
+      database.markAsDecryptFailed(messageId);
     } catch (InvalidMessageException e) {
       Log.w(TAG, e);
       database.markAsDecryptFailed(messageId);
@@ -128,7 +129,7 @@ public class SmsDecryptJob extends MasterSecretJob {
   private void handleSecureMessage(MasterSecret masterSecret, long messageId, long threadId,
                                    IncomingTextMessage message)
       throws NoSessionException, DuplicateMessageException,
-             InvalidMessageException, LegacyMessageException,
+             InvalidVersionException, InvalidMessageException, LegacyMessageException,
              UntrustedIdentityException
   {
     EncryptingSmsDatabase database  = DatabaseFactory.getEncryptingSmsDatabase(context);
@@ -194,9 +195,6 @@ public class SmsDecryptJob extends MasterSecretJob {
         KeyExchangeInitiator.initiate(context, masterSecret, recipients, false, message.getSubscriptionId());
         database.markAsProcessedKeyExchange(messageId);
       }
-    } catch (StaleKeyExchangeException e) {
-      Log.w(TAG, e);
-      database.markAsStaleKeyExchange(messageId);
     } catch (UntrustedIdentityException e) {
       Log.w(TAG, e);
 

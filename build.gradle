@@ -87,7 +87,7 @@ dependencies {
 
     implementation project (path: ':org.whispersystems.jobmanager')
     implementation project (path: ':org.whispersystems.libpastelog')
-    implementation project (path: ':org.whispersystems.libsignal')
+    implementation 'org.signal:libsignal-android:0.86.5'
 
     implementation 'com.annimon:stream:1.2.1'
     implementation 'com.takisoft.colorpicker:colorpicker:1.0.1'
@@ -100,6 +100,8 @@ dependencies {
     implementation project (':com.amulyakhare.textdrawable')
 
     implementation ('com.klinkerapps:android-smsmms:5.1.4')
+
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.assertj:assertj-core:1.7.1'
@@ -128,16 +130,18 @@ android {
     namespace 'org.smssecure.smssecure'
 
     defaultConfig {
-        versionCode 212
-        versionName "0.15.16"
+        versionCode 213
+        versionName "0.20.01 beta"
 
-        minSdkVersion 14
+        minSdkVersion 23
         targetSdkVersion 34
 
         vectorDrawables.useSupportLibrary = true
+        multiDexEnabled true
     }
 
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -153,6 +157,22 @@ android {
         exclude 'asm-license.txt'
         exclude 'META-INF/LICENSE'
         exclude 'META-INF/NOTICE'
+        // libsignal-client.jar bundles desktop JNI natives — exclude them from the APK
+        exclude '**/*.dylib'
+        exclude '**/*.dll'
+        // Exclude libsignal testing natives — only needed for Signal's own unit tests
+        exclude '**/libsignal_jni_testing.so'
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            // x86/x86_64 are emulator-only; ship only ARM for real devices.
+            // Remove the filter entirely (or add 'x86', 'x86_64') if you need emulator builds.
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk false
+        }
     }
 
     signingConfigs {

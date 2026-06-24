@@ -8,17 +8,19 @@ import org.smssecure.smssecure.protocol.WirePrefix;
 import org.smssecure.smssecure.recipients.RecipientFormattingException;
 import org.smssecure.smssecure.transport.UndeliverableMessageException;
 import org.smssecure.smssecure.util.Util;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.DuplicateMessageException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.LegacyMessageException;
-import org.whispersystems.libsignal.NoSessionException;
-import org.whispersystems.libsignal.SessionCipher;
-import org.whispersystems.libsignal.UntrustedIdentityException;
-import org.whispersystems.libsignal.protocol.CiphertextMessage;
-import org.whispersystems.libsignal.protocol.SignalMessage;
-import org.whispersystems.libsignal.state.SignalProtocolStore;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.DuplicateMessageException;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.InvalidVersionException;
+import org.signal.libsignal.protocol.LegacyMessageException;
+import org.signal.libsignal.protocol.NoSessionException;
+import org.signal.libsignal.protocol.SessionCipher;
+import org.signal.libsignal.protocol.UntrustedIdentityException;
+import org.signal.libsignal.protocol.message.CiphertextMessage;
+import org.signal.libsignal.protocol.message.SignalMessage;
+import org.signal.libsignal.protocol.state.SignalProtocolStore;
+import java.util.Optional;
 
 import java.io.IOException;
 
@@ -64,7 +66,7 @@ public class MmsCipher {
 
       try {
         plaintext = sessionCipher.decrypt(new SignalMessage(decodedCiphertext));
-      } catch (InvalidMessageException e) {
+      } catch (InvalidMessageException | InvalidVersionException | InvalidKeyException e) {
         // NOTE - For some reason, Sprint seems to append a single character to the
         // end of message text segments.  I don't know why, so here we just try
         // truncating the message by one if the MAC fails.
@@ -72,9 +74,13 @@ public class MmsCipher {
           Log.w(TAG, "Attempting truncated decrypt...");
           byte[] truncated = Util.trim(ciphertext.get(), ciphertext.get().length - 1);
           decodedCiphertext = textTransport.getDecodedMessage(truncated);
-          plaintext = sessionCipher.decrypt(new SignalMessage(decodedCiphertext));
+          try {
+            plaintext = sessionCipher.decrypt(new SignalMessage(decodedCiphertext));
+          } catch (InvalidVersionException | InvalidKeyException ex) {
+            throw new InvalidMessageException(ex);
+          }
         } else {
-          throw e;
+          throw new InvalidMessageException(e);
         }
       }
 
@@ -126,7 +132,7 @@ public class MmsCipher {
       }
     }
 
-    return Optional.absent();
+    return Optional.empty();
   }
 
 

@@ -25,12 +25,11 @@ import android.util.Log;
 
 import org.smssecure.smssecure.util.Base64;
 import org.smssecure.smssecure.util.dualsim.DualSimUtil;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECKeyPair;
-import org.whispersystems.libsignal.ecc.ECPrivateKey;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.IdentityKeyPair;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.ecc.ECKeyPair;
+import org.signal.libsignal.protocol.ecc.ECPrivateKey;
 
 import java.io.IOException;
 
@@ -93,7 +92,7 @@ public class IdentityKeyUtil {
 
   public static void generateIdentityKeys(Context context, MasterSecret masterSecret, int subscriptionId, boolean displayNotification) {
     Log.w(TAG, "Generating identity keys for subscription ID " + subscriptionId);
-    ECKeyPair    djbKeyPair     = Curve.generateKeyPair();
+    ECKeyPair    djbKeyPair     = ECKeyPair.generate();
 
     MasterCipher masterCipher   = new MasterCipher(masterSecret);
     IdentityKey  djbIdentityKey = new IdentityKey(djbKeyPair.getPublicKey());
@@ -113,7 +112,7 @@ public class IdentityKeyUtil {
 
   public static void generateCurve25519IdentityKeys(Context context, MasterSecret masterSecret, int subscriptionId) {
     MasterCipher masterCipher    = new MasterCipher(masterSecret);
-    ECKeyPair    djbKeyPair      = Curve.generateKeyPair();
+    ECKeyPair    djbKeyPair      = ECKeyPair.generate();
     IdentityKey  djbIdentityKey  = new IdentityKey(djbKeyPair.getPublicKey());
     byte[]       djbPrivateKey   = masterCipher.encryptKey(djbKeyPair.getPrivateKey());
 

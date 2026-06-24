@@ -24,11 +24,10 @@ import android.util.Log;
 
 import org.smssecure.smssecure.util.Base64;
 import org.smssecure.smssecure.util.Util;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECKeyPair;
-import org.whispersystems.libsignal.ecc.ECPrivateKey;
-import org.whispersystems.libsignal.ecc.ECPublicKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.ecc.ECKeyPair;
+import org.signal.libsignal.protocol.ecc.ECPrivateKey;
+import org.signal.libsignal.protocol.ecc.ECPublicKey;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -132,7 +131,7 @@ public class MasterSecretUtil {
       ECPrivateKey djbPrivateKey = null;
 
       if (djbPublicBytes != null) {
-        djbPublicKey = Curve.decodePoint(djbPublicBytes, 0);
+        djbPublicKey = new ECPublicKey(djbPublicBytes, 0);
       }
 
       if (masterSecret != null) {
@@ -153,7 +152,7 @@ public class MasterSecretUtil {
                                                                       MasterSecret masterSecret)
   {
     MasterCipher masterCipher = new MasterCipher(masterSecret);
-    ECKeyPair    keyPair      = Curve.generateKeyPair();
+    ECKeyPair    keyPair      = ECKeyPair.generate();
 
     save(context, ASYMMETRIC_LOCAL_PUBLIC_DJB, keyPair.getPublicKey().serialize());
     save(context, ASYMMETRIC_LOCAL_PRIVATE_DJB, masterCipher.encryptKey(keyPair.getPrivateKey()));

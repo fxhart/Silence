@@ -9,11 +9,12 @@ import org.smssecure.smssecure.crypto.MasterSecret;
 import org.smssecure.smssecure.recipients.Recipient;
 import org.smssecure.smssecure.recipients.RecipientFactory;
 import org.smssecure.smssecure.util.Conversions;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.state.SessionRecord;
-import org.whispersystems.libsignal.state.SessionState;
-import org.whispersystems.libsignal.state.SessionStore;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.state.SessionRecord;
+import org.signal.libsignal.protocol.state.SessionStore;
+
+import org.signal.libsignal.protocol.NoSessionException;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -21,10 +22,9 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-
-import static org.whispersystems.libsignal.state.StorageProtos.SessionStructure;
 
 public class SilenceSessionStore implements SessionStore {
 
@@ -32,9 +32,7 @@ public class SilenceSessionStore implements SessionStore {
   private static final String SESSIONS_DIRECTORY_V2 = "sessions-v2";
   private static final Object FILE_LOCK             = new Object();
 
-  private static final int SINGLE_STATE_VERSION   = 1;
-  private static final int ARCHIVE_STATES_VERSION = 2;
-  private static final int CURRENT_VERSION        = 2;
+  private static final int CURRENT_VERSION = 2;
 
   private final Context      context;
   private final MasterSecret masterSecret;
@@ -56,8 +54,7 @@ public class SilenceSessionStore implements SessionStore {
         MasterCipher    cipher = new MasterCipher(masterSecret);
         FileInputStream in     = new FileInputStream(getSessionFile(address));
 
-        int versionMarker  = readInteger(in);
-
+        int versionMarker = readInteger(in);
         if (versionMarker > CURRENT_VERSION) {
           throw new AssertionError("Unknown version: " + versionMarker);
         }
@@ -65,15 +62,13 @@ public class SilenceSessionStore implements SessionStore {
         byte[] serialized = cipher.decryptBytes(readBlob(in));
         in.close();
 
-        if (versionMarker == SINGLE_STATE_VERSION) {
-          SessionStructure sessionStructure = SessionStructure.parseFrom(serialized);
-          SessionState     sessionState     = new SessionState(sessionStructure);
-          return new SessionRecord(sessionState);
-        } else if (versionMarker == ARCHIVE_STATES_VERSION) {
-          return new SessionRecord(serialized);
-        } else {
-          throw new AssertionError("Unknown version: " + versionMarker);
+        // v1 sessions used the old protobuf-backed format; incompatible with new library.
+        // Return a fresh session record so the old session is simply discarded.
+        if (versionMarker == 1) {
+          return new SessionRecord();
         }
+
+        return new SessionRecord(serialized);
       } catch (InvalidMessageException | IOException e) {
         Log.w(TAG, "No existing session information found.");
         return new SessionRecord();
@@ -102,9 +97,20 @@ public class SilenceSessionStore implements SessionStore {
   }
 
   @Override
+  public List<SessionRecord> loadExistingSessions(List<SignalProtocolAddress> addresses) throws NoSessionException {
+    List<SessionRecord> results = new ArrayList<>(addresses.size());
+    for (SignalProtocolAddress address : addresses) {
+      SessionRecord record = loadSession(address);
+      if (!record.hasSenderChain()) throw new NoSessionException("No session for: " + address);
+      results.add(record);
+    }
+    return results;
+  }
+
+  @Override
   public boolean containsSession(SignalProtocolAddress address) {
     return getSessionFile(address).exists() &&
-           loadSession(address).getSessionState().hasSenderChain();
+           loadSession(address).hasSenderChain();
   }
 
   @Override
@@ -149,8 +155,7 @@ public class SilenceSessionStore implements SessionStore {
   }
 
   private File getSessionFile(SignalProtocolAddress address) {
-    String sessionName = getSessionName(address);
-    return new File(getSessionDirectory(), sessionName);
+    return new File(getSessionDirectory(), getSessionName(address));
   }
 
   private File getSessionDirectory() {
@@ -177,9 +182,8 @@ public class SilenceSessionStore implements SessionStore {
   }
 
   private byte[] readBlob(FileInputStream in) throws IOException {
-    int length       = readInteger(in);
+    int    length    = readInteger(in);
     byte[] blobBytes = new byte[length];
-
     in.read(blobBytes, 0, blobBytes.length);
     return blobBytes;
   }
@@ -196,8 +200,6 @@ public class SilenceSessionStore implements SessionStore {
   }
 
   private void writeInteger(int value, FileChannel out) throws IOException {
-    byte[] valueBytes = Conversions.intToByteArray(value);
-    out.write(ByteBuffer.wrap(valueBytes));
+    out.write(ByteBuffer.wrap(Conversions.intToByteArray(value)));
   }
-
 }

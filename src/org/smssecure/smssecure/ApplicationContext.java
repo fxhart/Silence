@@ -36,8 +36,8 @@ import org.smssecure.smssecure.util.dualsim.SimChangedReceiver;
 import org.whispersystems.jobqueue.JobManager;
 import org.whispersystems.jobqueue.dependencies.DependencyInjector;
 import org.whispersystems.jobqueue.requirements.NetworkRequirementProvider;
-import org.whispersystems.libsignal.logging.SignalProtocolLoggerProvider;
-import org.whispersystems.libsignal.util.AndroidSignalProtocolLogger;
+import org.signal.libsignal.protocol.logging.SignalProtocolLoggerProvider;
+import org.signal.libsignal.protocol.logging.AndroidSignalProtocolLogger;
 
 import java.security.Security;
 

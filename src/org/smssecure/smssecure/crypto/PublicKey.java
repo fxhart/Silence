@@ -21,9 +21,8 @@ import android.util.Log;
 
 import org.smssecure.smssecure.util.Hex;
 import org.smssecure.smssecure.util.Util;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECPublicKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.ecc.ECPublicKey;
 import org.smssecure.smssecure.util.Conversions;
 
 import java.security.MessageDigest;
@@ -55,7 +54,7 @@ public class PublicKey {
       throw new InvalidKeyException("Provided bytes are too short.");
 
     this.id        = Conversions.byteArrayToMedium(bytes, offset);
-    this.publicKey = Curve.decodePoint(bytes, offset + 3);
+    this.publicKey = new ECPublicKey(bytes, offset + 3);
   }
 
   public PublicKey(byte[] bytes) throws InvalidKeyException {

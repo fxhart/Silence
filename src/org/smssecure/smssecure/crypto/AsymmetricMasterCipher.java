@@ -19,12 +19,11 @@ package org.smssecure.smssecure.crypto;
 
 import org.smssecure.smssecure.util.Base64;
 import org.smssecure.smssecure.util.Util;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECKeyPair;
-import org.whispersystems.libsignal.ecc.ECPrivateKey;
-import org.whispersystems.libsignal.ecc.ECPublicKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.ecc.ECKeyPair;
+import org.signal.libsignal.protocol.ecc.ECPrivateKey;
+import org.signal.libsignal.protocol.ecc.ECPublicKey;
 import org.smssecure.smssecure.util.Conversions;
 
 import java.io.IOException;
@@ -68,7 +67,7 @@ public class AsymmetricMasterCipher {
       PublicKey theirPublicKey = new PublicKey(parts[0], 0);
 
       ECPrivateKey ourPrivateKey = asymmetricMasterSecret.getPrivateKey();
-      byte[]       secret        = Curve.calculateAgreement(theirPublicKey.getKey(), ourPrivateKey);
+      byte[]       secret        = ourPrivateKey.calculateAgreement(theirPublicKey.getKey());
       MasterCipher masterCipher  = getMasterCipherForSecret(secret);
       byte[]       decryptedBody = masterCipher.decryptBytes(parts[1]);
 
@@ -79,21 +78,17 @@ public class AsymmetricMasterCipher {
   }
 
   public String encryptBody(String body) {
-    try {
-      ECPublicKey  theirPublic        = asymmetricMasterSecret.getDjbPublicKey();
-      ECKeyPair    ourKeyPair         = Curve.generateKeyPair();
-      byte[]       secret             = Curve.calculateAgreement(theirPublic, ourKeyPair.getPrivateKey());
-      MasterCipher masterCipher       = getMasterCipherForSecret(secret);
-      byte[]       encryptedBodyBytes = masterCipher.encryptBytes(body.getBytes());
+    ECPublicKey  theirPublic        = asymmetricMasterSecret.getDjbPublicKey();
+    ECKeyPair    ourKeyPair         = ECKeyPair.generate();
+    byte[]       secret             = ourKeyPair.getPrivateKey().calculateAgreement(theirPublic);
+    MasterCipher masterCipher       = getMasterCipherForSecret(secret);
+    byte[]       encryptedBodyBytes = masterCipher.encryptBytes(body.getBytes());
 
-      PublicKey    ourPublicKey       = new PublicKey(31337, ourKeyPair.getPublicKey());
-      byte[]       publicKeyBytes     = ourPublicKey.serialize();
-      byte[]       combined           = Util.combine(publicKeyBytes, encryptedBodyBytes);
+    PublicKey    ourPublicKey       = new PublicKey(31337, ourKeyPair.getPublicKey());
+    byte[]       publicKeyBytes     = ourPublicKey.serialize();
+    byte[]       combined           = Util.combine(publicKeyBytes, encryptedBodyBytes);
 
-      return Base64.encodeBytes(combined);
-    } catch (InvalidKeyException e) {
-      throw new AssertionError(e);
-    }
+    return Base64.encodeBytes(combined);
   }
 
   private MasterCipher getMasterCipherForSecret(byte[] secretBytes) {

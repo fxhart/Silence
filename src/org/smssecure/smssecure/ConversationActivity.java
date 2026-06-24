@@ -61,7 +61,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.protobuf.ByteString;
 
 import org.smssecure.smssecure.TransportOptions.OnTransportChangedListener;
 import org.smssecure.smssecure.audio.AudioSlidePlayer;
@@ -123,8 +122,8 @@ import org.smssecure.smssecure.util.concurrent.ListenableFuture;
 import org.smssecure.smssecure.util.concurrent.SettableFuture;
 import org.smssecure.smssecure.util.dualsim.SubscriptionInfoCompat;
 import org.smssecure.smssecure.util.dualsim.SubscriptionManagerCompat;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import java.util.Optional;
 
 import java.io.IOException;
 import java.util.List;
@@ -909,7 +908,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
   }
 
   private void updateDefaultSubscriptionId(Optional<Integer> defaultSubscriptionId) {
-    Log.w(TAG, "updateDefaultSubscriptionId(" + defaultSubscriptionId.orNull() + ")");
+    Log.w(TAG, "updateDefaultSubscriptionId(" + defaultSubscriptionId.orElse(null) + ")");
     sendButton.setDefaultSubscriptionId(defaultSubscriptionId);
   }
 
@@ -1268,7 +1267,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
   }
 
   private MediaConstraints getCurrentMediaConstraints() {
-    return MediaConstraints.getMmsMediaConstraints(sendButton.getSelectedTransport().getSimSubscriptionId().or(-1), isSecureSmsDestination);
+    return MediaConstraints.getMmsMediaConstraints(sendButton.getSelectedTransport().getSimSubscriptionId().orElse(-1), isSecureSmsDestination);
   }
 
   private void markThreadAsRead() {
@@ -1326,7 +1325,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
       }
 
       boolean    forcePlaintext = sendButton.getSelectedTransport().isPlaintext();
-      int        subscriptionId = sendButton.getSelectedTransport().getSimSubscriptionId().or(-1);
+      int        subscriptionId = sendButton.getSelectedTransport().getSimSubscriptionId().orElse(-1);
 
       Log.w(TAG, "isManual Selection: " + sendButton.isManualSelection());
       Log.w(TAG, "forcePlaintext: " + forcePlaintext);
@@ -1443,7 +1442,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
       @Override
       protected Void doInBackground(Void... params) {
         DatabaseFactory.getRecipientPreferenceDatabase(ConversationActivity.this)
-                       .setDefaultSubscriptionId(recipients, subscriptionId.or(-1));
+                       .setDefaultSubscriptionId(recipients, subscriptionId.orElse(-1));
         return null;
       }
     }.execute();
@@ -1593,7 +1592,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
 
       Optional<RecipientsPreferences> prefs = DatabaseFactory.getRecipientPreferenceDatabase(ConversationActivity.this)
                                                              .getRecipientsPreferences(recipients[0].getIds());
-      return new Pair<>(recipients[0], prefs.orNull());
+      return new Pair<>(recipients[0], prefs.orElse(null));
     }
 
     @Override

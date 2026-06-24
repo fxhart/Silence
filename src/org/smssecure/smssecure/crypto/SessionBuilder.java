@@ -1,54 +1,46 @@
 package org.smssecure.smssecure.crypto;
 
-import org.smssecure.smssecure.protocol.KeyExchangeMessage;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.InvalidKeyIdException;
-import org.whispersystems.libsignal.SessionCipher;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.StaleKeyExchangeException;
-import org.whispersystems.libsignal.UntrustedIdentityException;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECKeyPair;
-import org.whispersystems.libsignal.ecc.ECPublicKey;
-import org.whispersystems.libsignal.logging.Log;
-import org.whispersystems.libsignal.protocol.CiphertextMessage;
-import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
-import org.whispersystems.libsignal.ratchet.AliceSignalProtocolParameters;
-import org.whispersystems.libsignal.ratchet.BobSignalProtocolParameters;
-import org.whispersystems.libsignal.ratchet.RatchetingSession;
-import org.whispersystems.libsignal.ratchet.SymmetricSignalProtocolParameters;
-import org.whispersystems.libsignal.state.IdentityKeyStore;
-import org.whispersystems.libsignal.state.PreKeyBundle;
-import org.whispersystems.libsignal.state.PreKeyStore;
-import org.whispersystems.libsignal.state.SessionRecord;
-import org.whispersystems.libsignal.state.SessionState;
-import org.whispersystems.libsignal.state.SessionStore;
-import org.whispersystems.libsignal.state.SignalProtocolStore;
-import org.whispersystems.libsignal.state.SignedPreKeyStore;
-import org.whispersystems.libsignal.util.KeyHelper;
-import org.whispersystems.libsignal.util.Medium;
-import org.whispersystems.libsignal.util.guava.Optional;
+import android.content.Context;
+import android.content.SharedPreferences;
 
+import org.smssecure.smssecure.protocol.KeyExchangeMessage;
+import org.signal.libsignal.protocol.IdentityKeyPair;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.UntrustedIdentityException;
+import org.signal.libsignal.protocol.ecc.ECKeyPair;
+import org.signal.libsignal.protocol.state.IdentityKeyStore;
+import org.signal.libsignal.protocol.state.PreKeyRecord;
+import org.signal.libsignal.protocol.state.PreKeyStore;
+import org.signal.libsignal.protocol.state.SessionStore;
+import org.signal.libsignal.protocol.state.SignalProtocolStore;
+import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
+import org.signal.libsignal.protocol.state.SignedPreKeyStore;
+
+/**
+ * Builds Signal Protocol sessions over SMS using a PreKeyBundle exchange.
+ *
+ * New protocol:
+ *  1. Initiator calls process() to generate a KeyExchangeMessage containing
+ *     their PreKeyBundle and sends it over SMS.
+ *  2. Responder calls process(KeyExchangeMessage) which calls the library's
+ *     SessionBuilder.process(PreKeyBundle), establishing an outgoing session.
+ *  3. Responder's first encrypted message is a PreKeySignalMessage, which
+ *     the initiator's SessionCipher.decrypt() uses to complete the exchange.
+ */
 public class SessionBuilder {
 
-  private static final String TAG = SessionBuilder.class.getSimpleName();
+  private static final String TAG                   = SessionBuilder.class.getSimpleName();
+  private static final String PENDING_KEYX_PREF     = "pending_key_exchange_";
+  private static final int    SIGNED_PREKEY_ID      = 1;
+  private static final int    ONE_TIME_PREKEY_ID    = 1;
 
-  private final SessionStore      sessionStore;
-  private final PreKeyStore       preKeyStore;
-  private final SignedPreKeyStore signedPreKeyStore;
-  private final IdentityKeyStore  identityKeyStore;
+  private final SessionStore       sessionStore;
+  private final PreKeyStore        preKeyStore;
+  private final SignedPreKeyStore  signedPreKeyStore;
+  private final IdentityKeyStore   identityKeyStore;
   private final SignalProtocolAddress remoteAddress;
 
-  /**
-   * Constructs a SessionBuilder.
-   *
-   * @param sessionStore The {@link org.whispersystems.libsignal.state.SessionStore} to store the constructed session in.
-   * @param preKeyStore The {@link  org.whispersystems.libsignal.state.PreKeyStore} where the client's local {@link org.whispersystems.libsignal.state.PreKeyRecord}s are stored.
-   * @param identityKeyStore The {@link org.whispersystems.libsignal.state.IdentityKeyStore} containing the client's identity key information.
-   * @param remoteAddress The address of the remote user to build a session with.
-   */
   public SessionBuilder(SessionStore sessionStore,
                         PreKeyStore preKeyStore,
                         SignedPreKeyStore signedPreKeyStore,
@@ -62,278 +54,74 @@ public class SessionBuilder {
     this.remoteAddress     = remoteAddress;
   }
 
-  /**
-   * Constructs a SessionBuilder
-   * @param store The {@link SignalProtocolStore} to store all state information in.
-   * @param remoteAddress The address of the remote user to build a session with.
-   */
   public SessionBuilder(SignalProtocolStore store, SignalProtocolAddress remoteAddress) {
     this(store, store, store, store, remoteAddress);
   }
 
   /**
-   * Build a new session from a received {@link PreKeySignalMessage}.
-   *
-   * After a session is constructed in this way, the embedded {@link SignalMessage}
-   * can be decrypted.
-   *
-   * @param message The received {@link PreKeySignalMessage}.
-   * @throws org.whispersystems.libsignal.InvalidKeyIdException when there is no local
-   *                                                             {@link org.whispersystems.libsignal.state.PreKeyRecord}
-   *                                                             that corresponds to the PreKey ID in
-   *                                                             the message.
-   * @throws org.whispersystems.libsignal.InvalidKeyException when the message is formatted incorrectly.
-   * @throws org.whispersystems.libsignal.UntrustedIdentityException when the {@link IdentityKey} of the sender is untrusted.
-   */
-  /*package*/ Optional<Integer> process(SessionRecord sessionRecord, PreKeySignalMessage message)
-      throws InvalidKeyIdException, InvalidKeyException, UntrustedIdentityException
-  {
-    IdentityKey theirIdentityKey = message.getIdentityKey();
-
-    if (!identityKeyStore.isTrustedIdentity(remoteAddress, theirIdentityKey, IdentityKeyStore.Direction.RECEIVING)) {
-      throw new UntrustedIdentityException(remoteAddress.getName(), theirIdentityKey);
-    }
-
-    Optional<Integer> unsignedPreKeyId = processV3(sessionRecord, message);
-
-    identityKeyStore.saveIdentity(remoteAddress, theirIdentityKey);
-    return unsignedPreKeyId;
-  }
-
-  private Optional<Integer> processV3(SessionRecord sessionRecord, PreKeySignalMessage message)
-      throws UntrustedIdentityException, InvalidKeyIdException, InvalidKeyException
-  {
-
-    if (sessionRecord.hasSessionState(message.getMessageVersion(), message.getBaseKey().serialize())) {
-      Log.w(TAG, "We've already setup a session for this V3 message, letting bundled message fall through...");
-      return Optional.absent();
-    }
-
-    ECKeyPair ourSignedPreKey = signedPreKeyStore.loadSignedPreKey(message.getSignedPreKeyId()).getKeyPair();
-
-    BobSignalProtocolParameters.Builder parameters = BobSignalProtocolParameters.newBuilder();
-
-    parameters.setTheirBaseKey(message.getBaseKey())
-              .setTheirIdentityKey(message.getIdentityKey())
-              .setOurIdentityKey(identityKeyStore.getIdentityKeyPair())
-              .setOurSignedPreKey(ourSignedPreKey)
-              .setOurRatchetKey(ourSignedPreKey);
-
-    if (message.getPreKeyId().isPresent()) {
-      parameters.setOurOneTimePreKey(Optional.of(preKeyStore.loadPreKey(message.getPreKeyId().get()).getKeyPair()));
-    } else {
-      parameters.setOurOneTimePreKey(Optional.<ECKeyPair>absent());
-    }
-
-    if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
-
-    RatchetingSession.initializeSession(sessionRecord.getSessionState(), parameters.create());
-
-    sessionRecord.getSessionState().setLocalRegistrationId(identityKeyStore.getLocalRegistrationId());
-    sessionRecord.getSessionState().setRemoteRegistrationId(message.getRegistrationId());
-    sessionRecord.getSessionState().setAliceBaseKey(message.getBaseKey().serialize());
-
-    if (message.getPreKeyId().isPresent() && message.getPreKeyId().get() != Medium.MAX_VALUE) {
-      return message.getPreKeyId();
-    } else {
-      return Optional.absent();
-    }
-  }
-
-  /**
-   * Build a new session from a {@link org.whispersystems.libsignal.state.PreKeyBundle} retrieved from
-   * a server.
-   *
-   * @param preKey A PreKey for the destination recipient, retrieved from a server.
-   * @throws InvalidKeyException when the {@link org.whispersystems.libsignal.state.PreKeyBundle} is
-   *                             badly formatted.
-   * @throws org.whispersystems.libsignal.UntrustedIdentityException when the sender's
-   *                                                                  {@link IdentityKey} is not
-   *                                                                  trusted.
-   */
-  public void process(PreKeyBundle preKey) throws InvalidKeyException, UntrustedIdentityException {
-    synchronized (SessionCipher.SESSION_LOCK) {
-      if (!identityKeyStore.isTrustedIdentity(remoteAddress, preKey.getIdentityKey(), IdentityKeyStore.Direction.SENDING)) {
-        throw new UntrustedIdentityException(remoteAddress.getName(), preKey.getIdentityKey());
-      }
-
-      if (preKey.getSignedPreKey() != null &&
-          !Curve.verifySignature(preKey.getIdentityKey().getPublicKey(),
-                                 preKey.getSignedPreKey().serialize(),
-                                 preKey.getSignedPreKeySignature()))
-      {
-        throw new InvalidKeyException("Invalid signature on device key!");
-      }
-
-      if (preKey.getSignedPreKey() == null) {
-        throw new InvalidKeyException("No signed prekey!");
-      }
-
-      SessionRecord         sessionRecord        = sessionStore.loadSession(remoteAddress);
-      ECKeyPair             ourBaseKey           = Curve.generateKeyPair();
-      ECPublicKey           theirSignedPreKey    = preKey.getSignedPreKey();
-      Optional<ECPublicKey> theirOneTimePreKey   = Optional.fromNullable(preKey.getPreKey());
-      Optional<Integer>     theirOneTimePreKeyId = theirOneTimePreKey.isPresent() ? Optional.of(preKey.getPreKeyId()) :
-                                                                                    Optional.<Integer>absent();
-
-      AliceSignalProtocolParameters.Builder parameters = AliceSignalProtocolParameters.newBuilder();
-
-      parameters.setOurBaseKey(ourBaseKey)
-                .setOurIdentityKey(identityKeyStore.getIdentityKeyPair())
-                .setTheirIdentityKey(preKey.getIdentityKey())
-                .setTheirSignedPreKey(theirSignedPreKey)
-                .setTheirRatchetKey(theirSignedPreKey)
-                .setTheirOneTimePreKey(theirOneTimePreKey);
-
-      if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
-
-      RatchetingSession.initializeSession(sessionRecord.getSessionState(), parameters.create());
-
-      sessionRecord.getSessionState().setUnacknowledgedPreKeyMessage(theirOneTimePreKeyId, preKey.getSignedPreKeyId(), ourBaseKey.getPublicKey());
-      sessionRecord.getSessionState().setLocalRegistrationId(identityKeyStore.getLocalRegistrationId());
-      sessionRecord.getSessionState().setRemoteRegistrationId(preKey.getRegistrationId());
-      sessionRecord.getSessionState().setAliceBaseKey(ourBaseKey.getPublicKey().serialize());
-
-      identityKeyStore.saveIdentity(remoteAddress, preKey.getIdentityKey());
-      sessionStore.storeSession(remoteAddress, sessionRecord);
-    }
-  }
-
-  /**
-   * Build a new session from a {@link org.whispersystems.libsignal.protocol.KeyExchangeMessage}
-   * received from a remote client.
-   *
-   * @param message The received KeyExchangeMessage.
-   * @return The KeyExchangeMessage to respond with, or null if no response is necessary.
-   * @throws InvalidKeyException if the received KeyExchangeMessage is badly formatted.
+   * Process a received KeyExchangeMessage (PreKeyBundle from the remote party).
+   * Establishes an outgoing session so we can send encrypted messages.
+   * Returns a response KeyExchangeMessage (our PreKeyBundle), or null if we
+   * already have an active session.
    */
   public KeyExchangeMessage process(KeyExchangeMessage message)
-      throws InvalidKeyException, UntrustedIdentityException, StaleKeyExchangeException
+      throws InvalidKeyException, UntrustedIdentityException
   {
-    synchronized (SessionCipher.SESSION_LOCK) {
-      if (!identityKeyStore.isTrustedIdentity(remoteAddress, message.getIdentityKey(), IdentityKeyStore.Direction.SENDING)) {
-        throw new UntrustedIdentityException(remoteAddress.getName(), message.getIdentityKey());
-      }
-
-      KeyExchangeMessage responseMessage = null;
-
-      if (message.isInitiate()) responseMessage = processInitiate(message);
-      else                      processResponse(message);
-
-      return responseMessage;
-    }
-  }
-
-  private KeyExchangeMessage processInitiate(KeyExchangeMessage message) throws InvalidKeyException {
-    int           flags         = KeyExchangeMessage.RESPONSE_FLAG;
-    SessionRecord sessionRecord = sessionStore.loadSession(remoteAddress);
-
-    if (!Curve.verifySignature(message.getIdentityKey().getPublicKey(),
-                               message.getBaseKey().serialize(),
-                               message.getBaseKeySignature()))
-    {
-      throw new InvalidKeyException("Bad signature!");
+    if (sessionStore.containsSession(remoteAddress)) {
+      return null;
     }
 
-    SymmetricSignalProtocolParameters.Builder builder = SymmetricSignalProtocolParameters.newBuilder();
+    org.signal.libsignal.protocol.SessionBuilder libBuilder =
+        new org.signal.libsignal.protocol.SessionBuilder(
+            sessionStore, preKeyStore, signedPreKeyStore, identityKeyStore, remoteAddress);
+    libBuilder.process(message.toPreKeyBundle());
 
-    if (!sessionRecord.getSessionState().hasPendingKeyExchange()) {
-      builder.setOurIdentityKey(identityKeyStore.getIdentityKeyPair())
-             .setOurBaseKey(Curve.generateKeyPair())
-             .setOurRatchetKey(Curve.generateKeyPair());
-    } else {
-      builder.setOurIdentityKey(sessionRecord.getSessionState().getPendingKeyExchangeIdentityKey())
-             .setOurBaseKey(sessionRecord.getSessionState().getPendingKeyExchangeBaseKey())
-             .setOurRatchetKey(sessionRecord.getSessionState().getPendingKeyExchangeRatchetKey());
-      flags |= KeyExchangeMessage.SIMULTAENOUS_INITIATE_FLAG;
-    }
-
-    builder.setTheirBaseKey(message.getBaseKey())
-           .setTheirRatchetKey(message.getRatchetKey())
-           .setTheirIdentityKey(message.getIdentityKey());
-
-    SymmetricSignalProtocolParameters parameters = builder.create();
-
-    if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
-
-    RatchetingSession.initializeSession(sessionRecord.getSessionState(), parameters);
-
-    identityKeyStore.saveIdentity(remoteAddress, message.getIdentityKey());
-    sessionStore.storeSession(remoteAddress, sessionRecord);
-
-    byte[] baseKeySignature = Curve.calculateSignature(parameters.getOurIdentityKey().getPrivateKey(),
-                                                       parameters.getOurBaseKey().getPublicKey().serialize());
-
-    return new KeyExchangeMessage(sessionRecord.getSessionState().getSessionVersion(),
-                                  message.getSequence(), flags,
-                                  parameters.getOurBaseKey().getPublicKey(),
-                                  baseKeySignature, parameters.getOurRatchetKey().getPublicKey(),
-                                  parameters.getOurIdentityKey().getPublicKey());
-  }
-
-  private void processResponse(KeyExchangeMessage message)
-      throws StaleKeyExchangeException, InvalidKeyException
-  {
-    SessionRecord sessionRecord                  = sessionStore.loadSession(remoteAddress);
-    SessionState  sessionState                   = sessionRecord.getSessionState();
-    boolean       hasPendingKeyExchange          = sessionState.hasPendingKeyExchange();
-    boolean       isSimultaneousInitiateResponse = message.isResponseForSimultaneousInitiate();
-
-    if (!hasPendingKeyExchange || sessionState.getPendingKeyExchangeSequence() != message.getSequence()) {
-      Log.w(TAG, "No matching sequence for response. Is simultaneous initiate response: " + isSimultaneousInitiateResponse);
-      if (!isSimultaneousInitiateResponse) throw new StaleKeyExchangeException();
-      else                                 return;
-    }
-
-    SymmetricSignalProtocolParameters.Builder parameters = SymmetricSignalProtocolParameters.newBuilder();
-
-    parameters.setOurBaseKey(sessionRecord.getSessionState().getPendingKeyExchangeBaseKey())
-              .setOurRatchetKey(sessionRecord.getSessionState().getPendingKeyExchangeRatchetKey())
-              .setOurIdentityKey(sessionRecord.getSessionState().getPendingKeyExchangeIdentityKey())
-              .setTheirBaseKey(message.getBaseKey())
-              .setTheirRatchetKey(message.getRatchetKey())
-              .setTheirIdentityKey(message.getIdentityKey());
-
-    if (!sessionRecord.isFresh()) sessionRecord.archiveCurrentState();
-
-    RatchetingSession.initializeSession(sessionRecord.getSessionState(), parameters.create());
-
-    if (!Curve.verifySignature(message.getIdentityKey().getPublicKey(),
-                               message.getBaseKey().serialize(),
-                               message.getBaseKeySignature()))
-    {
-      throw new InvalidKeyException("Base key signature doesn't match!");
-    }
-
-    identityKeyStore.saveIdentity(remoteAddress, message.getIdentityKey());
-    sessionStore.storeSession(remoteAddress, sessionRecord);
+    return buildOurBundle();
   }
 
   /**
-   * Initiate a new session by sending an initial KeyExchangeMessage to the recipient.
-   *
-   * @return the KeyExchangeMessage to deliver.
+   * Initiate a new session by generating our PreKeyBundle for the remote party.
    */
   public KeyExchangeMessage process() {
-    synchronized (SessionCipher.SESSION_LOCK) {
-      try {
-        int             sequence         = KeyHelper.getRandomSequence(65534) + 1;
-        int             flags            = KeyExchangeMessage.INITIATE_FLAG;
-        ECKeyPair       baseKey          = Curve.generateKeyPair();
-        ECKeyPair       ratchetKey       = Curve.generateKeyPair();
-        IdentityKeyPair identityKey      = identityKeyStore.getIdentityKeyPair();
-        byte[]          baseKeySignature = Curve.calculateSignature(identityKey.getPrivateKey(), baseKey.getPublicKey().serialize());
-        SessionRecord   sessionRecord    = sessionStore.loadSession(remoteAddress);
+    return buildOurBundle();
+  }
 
-        sessionRecord.getSessionState().setPendingKeyExchange(sequence, baseKey, ratchetKey, identityKey);
-        sessionStore.storeSession(remoteAddress, sessionRecord);
+  private KeyExchangeMessage buildOurBundle() {
+    IdentityKeyPair identityKeyPair = identityKeyStore.getIdentityKeyPair();
+    int             registrationId  = identityKeyStore.getLocalRegistrationId();
 
-        return new KeyExchangeMessage(CiphertextMessage.CURRENT_VERSION,
-                                      sequence, flags, baseKey.getPublicKey(), baseKeySignature,
-                                      ratchetKey.getPublicKey(), identityKey.getPublicKey());
-      } catch (InvalidKeyException e) {
-        throw new AssertionError(e);
-      }
-    }
+    ECKeyPair signedPreKeyPair = ECKeyPair.generate();
+    byte[]    signature        = identityKeyPair.getPrivateKey()
+                                                .calculateSignature(
+                                                    signedPreKeyPair.getPublicKey().serialize());
+    SignedPreKeyRecord signedPreKey = new SignedPreKeyRecord(
+        SIGNED_PREKEY_ID, System.currentTimeMillis(), signedPreKeyPair, signature);
+    signedPreKeyStore.storeSignedPreKey(SIGNED_PREKEY_ID, signedPreKey);
+
+    ECKeyPair    oneTimePreKeyPair = ECKeyPair.generate();
+    PreKeyRecord oneTimePreKey     = new PreKeyRecord(ONE_TIME_PREKEY_ID, oneTimePreKeyPair);
+    preKeyStore.storePreKey(ONE_TIME_PREKEY_ID, oneTimePreKey);
+
+    return new KeyExchangeMessage(
+        registrationId,
+        SIGNED_PREKEY_ID,
+        signedPreKeyPair.getPublicKey(),
+        signature,
+        identityKeyPair.getPublicKey(),
+        ONE_TIME_PREKEY_ID,
+        oneTimePreKeyPair.getPublicKey()
+    );
+  }
+
+  public static boolean hasPendingKeyExchange(Context context, String address) {
+    return context.getSharedPreferences("silence_crypto", Context.MODE_PRIVATE)
+                  .getBoolean(PENDING_KEYX_PREF + address, false);
+  }
+
+  public static void setPendingKeyExchange(Context context, String address, boolean pending) {
+    context.getSharedPreferences("silence_crypto", Context.MODE_PRIVATE)
+           .edit()
+           .putBoolean(PENDING_KEYX_PREF + address, pending)
+           .apply();
   }
 }

@@ -42,12 +42,12 @@ import org.smssecure.smssecure.util.Util;
 import org.whispersystems.jobqueue.JobParameters;
 import org.whispersystems.jobqueue.requirements.NetworkRequirement;
 import org.whispersystems.jobqueue.util.Base64;
-import org.whispersystems.libsignal.DuplicateMessageException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.LegacyMessageException;
-import org.whispersystems.libsignal.NoSessionException;
-import org.whispersystems.libsignal.UntrustedIdentityException;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.libsignal.protocol.DuplicateMessageException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.LegacyMessageException;
+import org.signal.libsignal.protocol.NoSessionException;
+import org.signal.libsignal.protocol.UntrustedIdentityException;
+import java.util.Optional;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

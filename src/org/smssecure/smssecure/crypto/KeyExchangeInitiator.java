@@ -6,27 +6,15 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package org.smssecure.smssecure.crypto;
 
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.os.Build;
-import android.telephony.SubscriptionInfo;
-import android.telephony.SubscriptionManager;
 import android.widget.Toast;
 
 import org.smssecure.smssecure.R;
-import org.smssecure.smssecure.crypto.SessionBuilder;
 import org.smssecure.smssecure.crypto.storage.SilenceIdentityKeyStore;
 import org.smssecure.smssecure.crypto.storage.SilencePreKeyStore;
 import org.smssecure.smssecure.crypto.storage.SilenceSessionStore;
@@ -39,15 +27,11 @@ import org.smssecure.smssecure.sms.OutgoingEndSessionMessage;
 import org.smssecure.smssecure.sms.OutgoingKeyExchangeMessage;
 import org.smssecure.smssecure.sms.OutgoingTextMessage;
 import org.smssecure.smssecure.util.Base64;
-import org.smssecure.smssecure.util.ResUtil;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.state.IdentityKeyStore;
-import org.whispersystems.libsignal.state.PreKeyStore;
-import org.whispersystems.libsignal.state.SessionRecord;
-import org.whispersystems.libsignal.state.SessionStore;
-import org.whispersystems.libsignal.state.SignedPreKeyStore;
-
-import java.util.List;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.state.IdentityKeyStore;
+import org.signal.libsignal.protocol.state.PreKeyStore;
+import org.signal.libsignal.protocol.state.SessionStore;
+import org.signal.libsignal.protocol.state.SignedPreKeyStore;
 
 public class KeyExchangeInitiator {
 
@@ -57,7 +41,7 @@ public class KeyExchangeInitiator {
   }
 
   public static void initiate(final Context context, final MasterSecret masterSecret, final Recipients recipients, boolean promptOnExisting, final int subscriptionId) {
-    if (promptOnExisting && hasInitiatedSession(context, masterSecret, recipients, subscriptionId)) {
+    if (promptOnExisting && hasInitiatedSession(context, recipients)) {
       AlertDialog.Builder dialog = new AlertDialog.Builder(context);
       dialog.setTitle(R.string.KeyExchangeInitiator_initiate_despite_existing_request_question);
       dialog.setMessage(R.string.KeyExchangeInitiator_youve_already_sent_a_session_initiation_request_to_this_recipient_are_you_sure);
@@ -82,14 +66,15 @@ public class KeyExchangeInitiator {
     SignedPreKeyStore signedPreKeyStore = new SilencePreKeyStore(context, masterSecret, subscriptionId);
     IdentityKeyStore  identityKeyStore  = new SilenceIdentityKeyStore(context, masterSecret, subscriptionId);
 
-    SessionBuilder    sessionBuilder    = new SessionBuilder(sessionStore, preKeyStore, signedPreKeyStore,
-                                                             identityKeyStore, new SignalProtocolAddress(recipient.getNumber(), 1));
+    SessionBuilder sessionBuilder = new SessionBuilder(sessionStore, preKeyStore, signedPreKeyStore,
+                                                        identityKeyStore, new SignalProtocolAddress(recipient.getNumber(), 1));
 
     if (identityKeyStore.getIdentityKeyPair() != null) {
       KeyExchangeMessage         keyExchangeMessage = sessionBuilder.process();
       String                     serializedMessage  = Base64.encodeBytesWithoutPadding(keyExchangeMessage.serialize());
       OutgoingKeyExchangeMessage textMessage        = new OutgoingKeyExchangeMessage(recipients, serializedMessage, subscriptionId);
 
+      SessionBuilder.setPendingKeyExchange(context, recipient.getNumber(), true);
       MessageSender.send(context, masterSecret, textMessage, -1, false);
     } else {
       Toast.makeText(context, R.string.VerifyIdentityActivity_you_do_not_have_an_identity_key,
@@ -97,13 +82,8 @@ public class KeyExchangeInitiator {
     }
   }
 
-  private static boolean hasInitiatedSession(Context context, MasterSecret masterSecret,
-                                             Recipients recipients, int subscriptionId)
-  {
-    Recipient     recipient     = recipients.getPrimaryRecipient();
-    SessionStore  sessionStore  = new SilenceSessionStore(context, masterSecret, subscriptionId);
-    SessionRecord sessionRecord = sessionStore.loadSession(new SignalProtocolAddress(recipient.getNumber(), 1));
-
-    return sessionRecord.getSessionState().hasPendingKeyExchange();
+  private static boolean hasInitiatedSession(Context context, Recipients recipients) {
+    Recipient recipient = recipients.getPrimaryRecipient();
+    return SessionBuilder.hasPendingKeyExchange(context, recipient.getNumber());
   }
 }

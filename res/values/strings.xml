@@ -761,8 +761,8 @@
     <string name="preferences__submit_debug_log">Submit debug log</string>
     <string name="preferences__support_wifi_calling">\'Wi-Fi Calling\' compatibility mode</string>
     <string name="preferences__enable_if_your_device_supports_sms_mms_delivery_over_wifi">Enable if your device uses SMS/MMS delivery over Wi-Fi (only enable when \'Wi-Fi Calling\' is enabled on your device).</string>
-    <string name="preferences__about">About IndigoSMS</string>
-    <string name="preferences__about_version">Version %s — fork of Silence by fxhart</string>
+    <string name="preferences__about">About this Silence fork</string>
+    <string name="preferences__about_version">Version %s</string>
     <string name="preferences__privacy_policy">Source code &amp; info</string>
     <string name="preferences__incognito_keyboard">Incognito keyboard</string>
     <string name="preferences__request_keyboard_to_disable_personalized_learning">If set to incognito mode, the keyboard won\'t remember, learn, or store any words you type</string>

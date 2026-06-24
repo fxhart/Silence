@@ -1,154 +1,150 @@
 package org.smssecure.smssecure.protocol;
 
-import com.google.protobuf.ByteString;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.ecc.ECPublicKey;
+import org.signal.libsignal.protocol.state.PreKeyBundle;
 
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.InvalidKeyException;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.InvalidVersionException;
-import org.whispersystems.libsignal.LegacyMessageException;
-import org.whispersystems.libsignal.protocol.CiphertextMessage;
-import org.whispersystems.libsignal.protocol.SignalProtos;
-import org.whispersystems.libsignal.ecc.Curve;
-import org.whispersystems.libsignal.ecc.ECPublicKey;
-import org.whispersystems.libsignal.util.ByteUtil;
+import java.nio.ByteBuffer;
 
-import java.io.IOException;
-
-import static org.whispersystems.libsignal.protocol.SignalProtos.KeyExchangeMessage.Builder;
-
+/**
+ * SMS key exchange message — carries a PreKeyBundle over SMS so the recipient
+ * can call SessionBuilder.process(preKeyBundle) and establish an outgoing session.
+ *
+ * Wire format (binary, then base64-encoded in SmsTransportDetails):
+ *   [1]  version byte (0x01)
+ *   [4]  registrationId (big-endian int)
+ *   [4]  signedPreKeyId (big-endian int)
+ *   [33] signedPreKey (EC public key bytes)
+ *   [64] signedPreKeySignature
+ *   [33] identityKey (EC public key bytes)
+ *   [4]  oneTimePreKeyId (big-endian int, -1 if absent)
+ *   [33] oneTimePreKey (EC public key bytes, all zeros if absent)
+ *   ---- total = 172 bytes -> base64 ~= 232 chars (fits in 2 SMS segments)
+ */
 public class KeyExchangeMessage {
 
-  public static final int INITIATE_FLAG              = 0x01;
-  public static final int RESPONSE_FLAG              = 0X02;
-  public static final int SIMULTAENOUS_INITIATE_FLAG = 0x04;
+  public static final int CURRENT_VERSION    = 1;
+  private static final int SIGNED_PK_SIZE    = 33;
+  private static final int SIGNATURE_SIZE    = 64;
+  private static final int IDENTITY_KEY_SIZE = 33;
 
-  private final int         version;
-  private final int         supportedVersion;
-  private final int         sequence;
-  private final int         flags;
-
-  private final ECPublicKey baseKey;
-  private final byte[]      baseKeySignature;
-  private final ECPublicKey ratchetKey;
+  private final int         registrationId;
+  private final int         signedPreKeyId;
+  private final ECPublicKey signedPreKey;
+  private final byte[]      signedPreKeySignature;
   private final IdentityKey identityKey;
+  private final int         oneTimePreKeyId;
+  private final ECPublicKey oneTimePreKey;
   private final byte[]      serialized;
 
-  public KeyExchangeMessage(int messageVersion, int sequence, int flags,
-                            ECPublicKey baseKey, byte[] baseKeySignature,
-                            ECPublicKey ratchetKey,
-                            IdentityKey identityKey)
+  /** Construct a KeyExchangeMessage to send. */
+  public KeyExchangeMessage(int registrationId,
+                            int signedPreKeyId,
+                            ECPublicKey signedPreKey,
+                            byte[] signedPreKeySignature,
+                            IdentityKey identityKey,
+                            int oneTimePreKeyId,
+                            ECPublicKey oneTimePreKey)
   {
-    this.supportedVersion = CiphertextMessage.CURRENT_VERSION;
-    this.version          = messageVersion;
-    this.sequence         = sequence;
-    this.flags            = flags;
-    this.baseKey          = baseKey;
-    this.baseKeySignature = baseKeySignature;
-    this.ratchetKey       = ratchetKey;
-    this.identityKey      = identityKey;
-
-    byte[]  version = {ByteUtil.intsToByteHighAndLow(this.version, this.supportedVersion)};
-    Builder builder = SignalProtos.KeyExchangeMessage
-                                   .newBuilder()
-                                   .setId((sequence << 5) | flags)
-                                   .setBaseKey(ByteString.copyFrom(baseKey.serialize()))
-                                   .setRatchetKey(ByteString.copyFrom(ratchetKey.serialize()))
-                                   .setIdentityKey(ByteString.copyFrom(identityKey.serialize()));
-
-    if (messageVersion >= 3) {
-      builder.setBaseKeySignature(ByteString.copyFrom(baseKeySignature));
-    }
-
-    this.serialized = ByteUtil.combine(version, builder.build().toByteArray());
+    this.registrationId        = registrationId;
+    this.signedPreKeyId        = signedPreKeyId;
+    this.signedPreKey          = signedPreKey;
+    this.signedPreKeySignature = signedPreKeySignature;
+    this.identityKey           = identityKey;
+    this.oneTimePreKeyId       = oneTimePreKey != null ? oneTimePreKeyId : -1;
+    this.oneTimePreKey         = oneTimePreKey;
+    this.serialized            = doSerialize(registrationId, signedPreKeyId, signedPreKey,
+                                             signedPreKeySignature, identityKey,
+                                             this.oneTimePreKeyId, oneTimePreKey);
   }
 
-  public KeyExchangeMessage(byte[] serialized)
-      throws InvalidMessageException, InvalidVersionException, LegacyMessageException
-  {
+  /** Deserialize a received KeyExchangeMessage. */
+  public KeyExchangeMessage(byte[] serialized) throws InvalidMessageException {
     try {
-      byte[][] parts        = ByteUtil.split(serialized, 1, serialized.length - 1);
-      this.version          = ByteUtil.highBitsToInt(parts[0][0]);
-      this.supportedVersion = ByteUtil.lowBitsToInt(parts[0][0]);
+      this.serialized = serialized;
+      ByteBuffer buf  = ByteBuffer.wrap(serialized);
 
-      if (this.version < CiphertextMessage.CURRENT_VERSION) {
-        throw new LegacyMessageException("Unsupported legacy version: " + this.version);
+      byte version = buf.get();
+      if (version != CURRENT_VERSION) {
+        throw new InvalidMessageException("Unknown KeyExchangeMessage version: " + version);
       }
 
-      if (this.version > CiphertextMessage.CURRENT_VERSION) {
-        throw new InvalidVersionException("Unknown version: " + this.version);
-      }
+      this.registrationId        = buf.getInt();
+      this.signedPreKeyId        = buf.getInt();
 
-      SignalProtos.KeyExchangeMessage message = SignalProtos.KeyExchangeMessage.parseFrom(parts[1]);
+      byte[] signedPkBytes       = new byte[SIGNED_PK_SIZE];
+      buf.get(signedPkBytes);
+      this.signedPreKey          = new ECPublicKey(signedPkBytes, 0);
 
-      if (!message.hasId()           || !message.hasBaseKey()     ||
-          !message.hasRatchetKey()   || !message.hasIdentityKey() ||
-          !message.hasBaseKeySignature())
-      {
-        throw new InvalidMessageException("Some required fields missing!");
-      }
+      this.signedPreKeySignature = new byte[SIGNATURE_SIZE];
+      buf.get(this.signedPreKeySignature);
 
-      this.sequence         = message.getId() >> 5;
-      this.flags            = message.getId() & 0x1f;
-      this.serialized       = serialized;
-      this.baseKey          = Curve.decodePoint(message.getBaseKey().toByteArray(), 0);
-      this.baseKeySignature = message.getBaseKeySignature().toByteArray();
-      this.ratchetKey       = Curve.decodePoint(message.getRatchetKey().toByteArray(), 0);
-      this.identityKey      = new IdentityKey(message.getIdentityKey().toByteArray(), 0);
-    } catch (InvalidKeyException | IOException e) {
+      byte[] identityKeyBytes    = new byte[IDENTITY_KEY_SIZE];
+      buf.get(identityKeyBytes);
+      this.identityKey           = new IdentityKey(identityKeyBytes, 0);
+
+      this.oneTimePreKeyId       = buf.getInt();
+
+      byte[] otpkBytes           = new byte[SIGNED_PK_SIZE];
+      buf.get(otpkBytes);
+      this.oneTimePreKey         = (this.oneTimePreKeyId == -1) ? null
+                                                                 : new ECPublicKey(otpkBytes, 0);
+    } catch (InvalidKeyException e) {
       throw new InvalidMessageException(e);
     }
   }
 
-  public int getVersion() {
-    return version;
+  /** Convert to a PreKeyBundle for use with SessionBuilder.process(). */
+  public PreKeyBundle toPreKeyBundle() {
+    return new PreKeyBundle(
+        registrationId,
+        1,
+        oneTimePreKey != null ? oneTimePreKeyId : PreKeyBundle.NULL_PRE_KEY_ID,
+        oneTimePreKey,
+        signedPreKeyId,
+        signedPreKey,
+        signedPreKeySignature,
+        identityKey,
+        0, null, null
+    );
   }
 
-  public ECPublicKey getBaseKey() {
-    return baseKey;
-  }
+  public int getRegistrationId()              { return registrationId; }
+  public int getSignedPreKeyId()              { return signedPreKeyId; }
+  public ECPublicKey getSignedPreKey()        { return signedPreKey; }
+  public byte[] getSignedPreKeySignature()    { return signedPreKeySignature; }
+  public IdentityKey getIdentityKey()         { return identityKey; }
+  public int getOneTimePreKeyId()             { return oneTimePreKeyId; }
+  public ECPublicKey getOneTimePreKey()       { return oneTimePreKey; }
+  public boolean hasOneTimePreKey()           { return oneTimePreKey != null; }
+  public byte[] serialize()                   { return serialized; }
 
-  public byte[] getBaseKeySignature() {
-    return baseKeySignature;
-  }
+  private static byte[] doSerialize(int registrationId,
+                                    int signedPreKeyId,
+                                    ECPublicKey signedPreKey,
+                                    byte[] signature,
+                                    IdentityKey identityKey,
+                                    int oneTimePreKeyId,
+                                    ECPublicKey oneTimePreKey)
+  {
+    byte[] signedPkBytes    = signedPreKey.serialize();
+    byte[] identityKeyBytes = identityKey.serialize();
+    byte[] otpkBytes        = oneTimePreKey != null
+                              ? oneTimePreKey.serialize()
+                              : new byte[SIGNED_PK_SIZE];
 
-  public ECPublicKey getRatchetKey() {
-    return ratchetKey;
-  }
-
-  public IdentityKey getIdentityKey() {
-    return identityKey;
-  }
-
-  public boolean hasIdentityKey() {
-    return true;
-  }
-
-  public int getMaxVersion() {
-    return supportedVersion;
-  }
-
-  public boolean isResponse() {
-    return ((flags & RESPONSE_FLAG) != 0);
-  }
-
-  public boolean isInitiate() {
-    return (flags & INITIATE_FLAG) != 0;
-  }
-
-  public boolean isResponseForSimultaneousInitiate() {
-    return (flags & SIMULTAENOUS_INITIATE_FLAG) != 0;
-  }
-
-  public int getFlags() {
-    return flags;
-  }
-
-  public int getSequence() {
-    return sequence;
-  }
-
-  public byte[] serialize() {
-    return serialized;
+    ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + SIGNED_PK_SIZE + SIGNATURE_SIZE
+                                           + IDENTITY_KEY_SIZE + 4 + SIGNED_PK_SIZE);
+    buf.put((byte) CURRENT_VERSION);
+    buf.putInt(registrationId);
+    buf.putInt(signedPreKeyId);
+    buf.put(signedPkBytes);
+    buf.put(signature);
+    buf.put(identityKeyBytes);
+    buf.putInt(oneTimePreKeyId);
+    buf.put(otpkBytes);
+    return buf.array();
   }
 }

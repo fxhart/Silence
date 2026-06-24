@@ -8,10 +8,10 @@ import org.smssecure.smssecure.crypto.SessionUtil;
 import org.smssecure.smssecure.database.DatabaseFactory;
 import org.smssecure.smssecure.recipients.RecipientFactory;
 import org.smssecure.smssecure.util.SilencePreferences;
-import org.whispersystems.libsignal.IdentityKey;
-import org.whispersystems.libsignal.IdentityKeyPair;
-import org.whispersystems.libsignal.SignalProtocolAddress;
-import org.whispersystems.libsignal.state.IdentityKeyStore;
+import org.signal.libsignal.protocol.IdentityKey;
+import org.signal.libsignal.protocol.IdentityKeyPair;
+import org.signal.libsignal.protocol.SignalProtocolAddress;
+import org.signal.libsignal.protocol.state.IdentityKeyStore;
 
 public class SilenceIdentityKeyStore implements IdentityKeyStore {
 
@@ -38,11 +38,15 @@ public class SilenceIdentityKeyStore implements IdentityKeyStore {
   }
 
   @Override
-  public boolean saveIdentity(SignalProtocolAddress address, IdentityKey identityKey) {
+  public IdentityKeyStore.IdentityChange saveIdentity(SignalProtocolAddress address, IdentityKey identityKey) {
     synchronized (LOCK) {
-      long recipientId = RecipientFactory.getRecipientsFromString(context, address.getName(), true).getPrimaryRecipient().getRecipientId();
+      long    recipientId   = RecipientFactory.getRecipientsFromString(context, address.getName(), true).getPrimaryRecipient().getRecipientId();
+      boolean wasValid      = DatabaseFactory.getIdentityDatabase(context).isValidIdentity(masterSecret, recipientId, identityKey);
       DatabaseFactory.getIdentityDatabase(context).saveIdentity(masterSecret, recipientId, identityKey);
-      return true;
+      // isValidIdentity returns true when no prior record exists, or when identity matches.
+      // false means a different key was stored → we're replacing it.
+      return wasValid ? IdentityKeyStore.IdentityChange.NEW_OR_UNCHANGED
+                      : IdentityKeyStore.IdentityChange.REPLACED_EXISTING;
     }
   }
 

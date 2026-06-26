@@ -102,9 +102,10 @@ public class KeyExchangeMessage {
 
   /** Convert to a PreKeyBundle for use with SessionBuilder.process(). */
   public PreKeyBundle toPreKeyBundle() {
-    // PreKeyBundle requires a non-null KEMPublicKey even when Kyber is not in use.
-    // Generate a throwaway keypair — it will be ignored because our KyberPreKeyStore
-    // stubs always return empty/false, so the library won't complete a Kyber handshake.
+    // PreKeyBundle requires a non-null KEMPublicKey (Kotlin non-null contract), but SMS
+    // does not use Kyber. Pass NULL_PRE_KEY_ID as the kyber ID so the Rust native code
+    // skips Kyber signature verification entirely — same semantics as an absent one-time
+    // pre-key. The throwaway public key is only here to satisfy the Kotlin null check.
     KEMKeyPair throwawayKyberPair = KEMKeyPair.generate(KEMKeyType.KYBER_1024);
     return new PreKeyBundle(
         registrationId,
@@ -115,7 +116,7 @@ public class KeyExchangeMessage {
         signedPreKey,
         signedPreKeySignature,
         identityKey,
-        0, throwawayKyberPair.getPublicKey(), new byte[0]
+        PreKeyBundle.NULL_PRE_KEY_ID, throwawayKyberPair.getPublicKey(), new byte[0]
     );
   }
 

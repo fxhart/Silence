@@ -4,6 +4,8 @@ import org.signal.libsignal.protocol.IdentityKey;
 import org.signal.libsignal.protocol.InvalidKeyException;
 import org.signal.libsignal.protocol.InvalidMessageException;
 import org.signal.libsignal.protocol.ecc.ECPublicKey;
+import org.signal.libsignal.protocol.kem.KEMKeyPair;
+import org.signal.libsignal.protocol.kem.KEMKeyType;
 import org.signal.libsignal.protocol.state.PreKeyBundle;
 
 import java.nio.ByteBuffer;
@@ -100,6 +102,10 @@ public class KeyExchangeMessage {
 
   /** Convert to a PreKeyBundle for use with SessionBuilder.process(). */
   public PreKeyBundle toPreKeyBundle() {
+    // PreKeyBundle requires a non-null KEMPublicKey even when Kyber is not in use.
+    // Generate a throwaway keypair — it will be ignored because our KyberPreKeyStore
+    // stubs always return empty/false, so the library won't complete a Kyber handshake.
+    KEMKeyPair throwawayKyberPair = KEMKeyPair.generate(KEMKeyType.KYBER_1024);
     return new PreKeyBundle(
         registrationId,
         1,
@@ -109,7 +115,7 @@ public class KeyExchangeMessage {
         signedPreKey,
         signedPreKeySignature,
         identityKey,
-        0, null, null
+        0, throwawayKyberPair.getPublicKey(), new byte[0]
     );
   }
 

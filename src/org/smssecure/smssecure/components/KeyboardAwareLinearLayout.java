@@ -16,23 +16,22 @@
  */
 package org.smssecure.smssecure.components;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Build.VERSION_CODES;
 import android.preference.PreferenceManager;
 import androidx.appcompat.widget.LinearLayoutCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
-import android.view.View;
 
 import org.smssecure.smssecure.R;
 import org.smssecure.smssecure.util.ServiceUtil;
 import org.smssecure.smssecure.util.Util;
 
-import java.lang.reflect.Field;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -111,22 +110,10 @@ public class KeyboardAwareLinearLayout extends LinearLayoutCompat {
     }
   }
 
-  @TargetApi(VERSION_CODES.LOLLIPOP)
   private int getViewInset() {
-    try {
-      Field attachInfoField = View.class.getDeclaredField("mAttachInfo");
-      attachInfoField.setAccessible(true);
-      Object attachInfo = attachInfoField.get(this);
-      if (attachInfo != null) {
-        Field stableInsetsField = attachInfo.getClass().getDeclaredField("mStableInsets");
-        stableInsetsField.setAccessible(true);
-        Rect insets = (Rect)stableInsetsField.get(attachInfo);
-        return insets.bottom;
-      }
-    } catch (NoSuchFieldException nsfe) {
-      Log.w(TAG, "field reflection error when measuring view inset", nsfe);
-    } catch (IllegalAccessException iae) {
-      Log.w(TAG, "access reflection error when measuring view inset", iae);
+    WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(this);
+    if (insets != null) {
+      return insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;
     }
     return 0;
   }

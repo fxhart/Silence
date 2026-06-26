@@ -146,6 +146,23 @@ public class KeyCachingService extends Service {
   public void onCreate() {
     Log.w("KeyCachingService", "onCreate()");
     super.onCreate();
+
+    // Android 8+ requires startForeground() to be called very quickly after
+    // startForegroundService(). Call it immediately with a placeholder notification
+    // so we never hit ForegroundServiceDidNotStartInTimeException. foregroundService()
+    // will replace it with the proper notification once the master secret is available.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NotificationChannels.LOCKED_STATUS);
+      builder.setSmallIcon(R.drawable.icon_cached);
+      builder.setContentTitle(getString(R.string.KeyCachingService_passphrase_cached));
+      builder.setPriority(Notification.PRIORITY_MIN);
+      if (Build.VERSION.SDK_INT >= 29) {
+        startForeground(SERVICE_RUNNING_ID, builder.build(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+      } else {
+        startForeground(SERVICE_RUNNING_ID, builder.build());
+      }
+    }
+
     this.pending = PendingIntent.getService(this, 0, new Intent(PASSPHRASE_EXPIRED_EVENT, null,
                                                                 this, KeyCachingService.class), PendingIntent.FLAG_IMMUTABLE);
 

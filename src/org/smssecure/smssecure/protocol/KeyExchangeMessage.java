@@ -67,7 +67,9 @@ public class KeyExchangeMessage {
       ByteBuffer buf  = ByteBuffer.wrap(serialized);
 
       byte version = buf.get();
-      if (version != CURRENT_VERSION) {
+      // Version byte is encoded as (current << 4 | current) so the multipart transport layer
+      // reads the high nibble correctly. Extract the high nibble for the version check.
+      if (((version & 0xFF) >> 4) != CURRENT_VERSION) {
         throw new InvalidMessageException("Unknown KeyExchangeMessage version: " + version);
       }
 
@@ -137,7 +139,9 @@ public class KeyExchangeMessage {
 
     ByteBuffer buf = ByteBuffer.allocate(1 + 4 + 4 + SIGNED_PK_SIZE + SIGNATURE_SIZE
                                            + IDENTITY_KEY_SIZE + 4 + SIGNED_PK_SIZE);
-    buf.put((byte) CURRENT_VERSION);
+    // Encode version as (current << 4 | current) so the MultipartSmsTransportMessage layer
+    // reads a non-zero high nibble and doesn't treat this as a deprecated (pre-multipart) message.
+    buf.put((byte) ((CURRENT_VERSION << 4) | CURRENT_VERSION));
     buf.putInt(registrationId);
     buf.putInt(signedPreKeyId);
     buf.put(signedPkBytes);
